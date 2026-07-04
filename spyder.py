@@ -49,7 +49,8 @@ class Spyder(CommitFetcher, CallGPT, TeamsNotifier):
         self.headers = {"Authorization": "token " + PERSONAL_TOKEN}
         # api_url = 'https://api.github.com/repos/MicrosoftDocs/azure-docs/commits'
         
-        # 设置调度间隔为7200秒（2小时）
+        # 保留此常數僅用於 weekly summary 週一判斷 (line ~104: seconds_since_midnight < self.schedule)。
+        # 實際執行頻率由 ACA Job cron (0 */2 * * *) 接管，此值不再決定執行週期。
         self.schedule = 7200
         
         # 初始化CosmosDB处理器和客户端

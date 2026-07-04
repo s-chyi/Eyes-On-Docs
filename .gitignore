@@ -6,6 +6,9 @@ test.json
 last_crawl_time.txt
 localtest*
 target_config.json
+# Nick-only smoke test config (single AML topic, empty webhook) — never commit
+target_config-nick-smoke.json
+target_config-nick*.json
 # include-link resolver cache — regenerated at runtime, not shared
 include_link_cache.json
 # static
@@ -61,6 +64,10 @@ web/next-env.d.ts
 .claude/hook-debug.log
 .claude/hook-debug.log.*
 .claude/scheduled_tasks.json
+# ACA deployment runtime state (secrets, logs, execution names — Nick-only)
+.claude/aca-deploy-state/
+# Ad-hoc helper scripts (Nick-only bootstrap)
+.claude/scripts/
 
 # include_link_resolver runtime cache (auto-generated at repo root by include_link_resolver.py)
 include_link_cache.json
