@@ -1,0 +1,26 @@
+# Dockerfile.mcp — Eyes-On-Docs MCP HTTP server for ACA Container App
+# Base: python:3.11-slim-bookworm; ingress → :8000 (FastMCP streamable-http).
+
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    FASTMCP_HOST=0.0.0.0 \
+    FASTMCP_PORT=8000
+
+WORKDIR /app
+
+# MCP server 只需要 mcp[cli] 與 httpx，不共用 monitor 的 requirements.txt 以縮小 image
+RUN pip install --no-cache-dir "mcp[cli]" "httpx"
+
+COPY mcp_server/eyesondocs_mcp_server_http_search_fetch.py ./server.py
+
+EXPOSE 8000
+
+CMD ["python", "-u", "server.py"]

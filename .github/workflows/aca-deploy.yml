@@ -1,0 +1,109 @@
+# .github/workflows/aca-deploy.yml
+# Deploys eyes-on-docs 三個元件（web / mcp / monitor）到 Azure Container Apps。
+# Auth: OIDC federated credential 走 Entra app sp-github-oidc-eyesondocs（Nick fork）。
+#
+# 需要在 GitHub repo 設定：
+#   Variables:  AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#               ACR_NAME, RESOURCE_GROUP, ACA_ENVIRONMENT,
+#               WEB_APP_NAME, MCP_APP_NAME, MONITOR_JOB_NAME,
+#               WEB_FQDN (smoke test)
+#   Secrets:    NEXT_PUBLIC_GA_ID (build-time inline, not sensitive but repo-specific)
+
+name: aca-deploy
+
+# 只允許手動觸發 (workflow_dispatch)、不 push-triggered。
+# 原因：這個 workflow 綁 s-chyi UAMI 的 federated credential + Nick 的 GitHub Variables,
+# push 到 master 自動 fire 會誤觸發 production deploy。
+# 需要 rollout 時到 Actions UI 點 Run workflow、或用 gh workflow run aca-deploy.yml
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # OIDC
+  contents: read
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - name: monitor
+            dockerfile: Dockerfile.monitor
+          - name: mcp
+            dockerfile: Dockerfile.mcp
+          - name: web
+            dockerfile: Dockerfile.web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Build & push ${{ matrix.component.name }}
+        run: |
+          IMAGE="${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-${{ matrix.component.name }}:${IMAGE_TAG}"
+          BUILD_ARGS=""
+          if [ "${{ matrix.component.name }}" = "web" ]; then
+            BUILD_ARGS="--build-arg NEXT_PUBLIC_GA_ID=${{ secrets.NEXT_PUBLIC_GA_ID }}"
+          fi
+          docker build -f ${{ matrix.component.dockerfile }} $BUILD_ARGS -t "$IMAGE" .
+          docker push "$IMAGE"
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update web app
+        run: |
+          az containerapp update \
+            --name ${{ vars.WEB_APP_NAME }} \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --image ${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-web:${IMAGE_TAG}
+
+      - name: Update mcp app
+        run: |
+          az containerapp update \
+            --name ${{ vars.MCP_APP_NAME }} \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --image ${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-mcp:${IMAGE_TAG}
+
+      - name: Update monitor job
+        run: |
+          az containerapp job update \
+            --name ${{ vars.MONITOR_JOB_NAME }} \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --image ${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-monitor:${IMAGE_TAG}
+
+      - name: Smoke test (web)
+        run: |
+          # /api/products 有 fallback branch，即使 config 缺也 return 200 → 適合 readiness
+          for i in 1 2 3 4 5; do
+            if curl -fsS -o /dev/null "https://${{ vars.WEB_FQDN }}/api/products"; then
+              echo "web smoke ok"
+              exit 0
+            fi
+            echo "web smoke retry $i"
+            sleep 10
+          done
+          echo "web smoke failed"; exit 1

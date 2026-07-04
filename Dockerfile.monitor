@@ -1,0 +1,41 @@
+# Dockerfile.monitor — Eyes-On-Docs Python monitor for ACA Container Apps Job
+# Base: python:3.11-slim-bookworm; cron schedule managed by ACA Job (0 */2 * * *).
+
+FROM python:3.11-slim-bookworm
+
+# 系統相依（tiktoken/numpy 有時需要 build tools，用 slim 為主，必要才加 build-essential）
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# 先裝依賴，善用 Docker layer cache
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 烤入 monitor 需要的所有 Python 模組 + prompts + config
+# target_config-nick-smoke.json 是 Nick 專用 smoke test config (1 topic, empty webhook)
+# ACA Job 靠 TARGET_CONFIG_PATH env 切換到 smoke config；VM/Joey 環境 default 讀 target_config.json 不受影響
+COPY eyes_on_docs.py \
+     spyder.py \
+     commit_fetch.py \
+     call_gpt.py \
+     cosmosdb_client.py \
+     cosmosdbservice.py \
+     gpt_reply.py \
+     include_link_resolver.py \
+     logs.py \
+     teams_notifier.py \
+     prompts.toml \
+     target_config.json \
+     target_config-nick-smoke.json \
+     ./
+
+# ACA Job 執行一次 process_targets 就 exit(0)
+CMD ["python", "-u", "eyes_on_docs.py"]
