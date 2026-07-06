@@ -11,13 +11,15 @@ interface TargetConfig {
 
 export async function GET() {
   try {
-    // Path to target_config.json in the root directory
-    const configPath = path.join(process.cwd(), '..', 'target_config.json');
-    
+    // ACA 容器內從環境變數讀 config path，預設為 image 內烤好的 /app/config/target_config.json
+    // 本機 dev 時可覆寫成專案根目錄的 target_config.json（例如 ../target_config.json）
+    const configPath = process.env.TARGET_CONFIG_PATH
+      || path.join(process.cwd(), '..', 'target_config.json');
+
     // Check if file exists
     if (!fs.existsSync(configPath)) {
       console.error(`Config file not found at: ${configPath}, using fallback products`);
-      return NextResponse.json({ 
+      return NextResponse.json({
         products: FALLBACK_PRODUCTS,
         labels: PRODUCT_LABELS,
         source: 'fallback',
@@ -60,7 +62,7 @@ export async function GET() {
 
   } catch (error) {
     console.error('Error reading target_config.json:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       products: FALLBACK_PRODUCTS,
       labels: PRODUCT_LABELS,
       source: 'fallback',
@@ -68,3 +70,5 @@ export async function GET() {
     });
   }
 }
+
+export const dynamic = 'force-dynamic';

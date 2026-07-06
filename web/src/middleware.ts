@@ -1,23 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { CosmosClient } from '@azure/cosmos';
-import { ClientSecretCredential } from '@azure/identity';
-
-// Initialize Azure AD credentials
-const credential = new ClientSecretCredential(
-  process.env.APP_TENANT_ID!,
-  process.env.APP_CLIENT_ID!,
-  process.env.APP_CLIENT_SECRET!
-);
-
-// Initialize the Cosmos Client
-const client = new CosmosClient({
-  endpoint: `https://${process.env.AZURE_COSMOSDB_ACCOUNT}.documents.azure.com:443/`,
-  aadCredentials: credential
-});
+import { getCosmosClient } from '@/lib/cosmos';
 
 export async function middleware(request: NextRequest) {
+  const client = getCosmosClient();
   // 获取用户会话信息
   const token = await getToken({ req: request as any });
   const isAuthPage = request.nextUrl.pathname.startsWith('/auth');
@@ -86,3 +73,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
+
+// 明確宣告走 Node.js runtime（Cosmos SDK + ClientSecretCredential 需要，Edge runtime 跑不起來）
+export const runtime = 'nodejs';

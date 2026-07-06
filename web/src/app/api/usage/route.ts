@@ -1,23 +1,10 @@
 import { NextResponse } from 'next/server';
-import { CosmosClient } from '@azure/cosmos';
-import { ClientSecretCredential } from '@azure/identity';
 import { logger } from '@/lib/logger';
 import { validateAdminPassword } from '@/lib/adminAuth';
-
-// Initialize Azure AD credentials
-const credential = new ClientSecretCredential(
-  process.env.APP_TENANT_ID!,
-  process.env.APP_CLIENT_ID!,
-  process.env.APP_CLIENT_SECRET! 
-);
-
-// Initialize the Cosmos Client
-const client = new CosmosClient({
-  endpoint: `https://${process.env.AZURE_COSMOSDB_ACCOUNT}.documents.azure.com:443/`,
-  aadCredentials: credential
-});
+import { getCosmosClient } from '@/lib/cosmos';
 
 export async function GET(request: Request) {
+  const client = getCosmosClient();
   const auth = validateAdminPassword(request.headers.get('x-admin-password'));
   if (!auth.ok) {
     return NextResponse.json(

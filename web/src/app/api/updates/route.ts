@@ -1,82 +1,9 @@
 import { NextResponse } from 'next/server';
-import { CosmosClient } from '@azure/cosmos';
-import { ClientSecretCredential } from '@azure/identity';
-import * as fs from 'fs';
-import * as path from 'path';
 import { logger } from '@/lib/logger';
-
-// Function to log to file
-function logToFile(message: string, level: 'info' | 'error' | 'warning' | 'debug' = 'info') {
-  const logLevel = process.env.LOG_LEVEL || 'info';
-  const levels = ['debug', 'info', 'warning', 'error'];
-  const currentLevelIndex = levels.indexOf(logLevel);
-  const messageLevelIndex = levels.indexOf(level);
-
-  if (messageLevelIndex < currentLevelIndex) {
-    return;
-  }
-  const logDir = path.join(process.cwd(), 'logs');
-  
-  // Create logs directory if it doesn't exist
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir);
-  }
-
-  const logFile = path.join(logDir, `updates_${new Date().toISOString().split('T')[0]}.log`);
-  
-  const timestamp = new Date().toISOString();
-  const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}\n`;
-  
-  fs.appendFileSync(logFile, logMessage);
-}
-
-// Validate environment variables before initialization
-const requiredEnvVars = [
-  'APP_TENANT_ID',
-  'APP_CLIENT_ID',
-  'APP_CLIENT_SECRET',
-  'AZURE_COSMOSDB_ACCOUNT',
-  'AZURE_COSMOSDB_DATABASE',
-  'AZURE_COSMOSDB_CONVERSATIONS_CONTAINER'
-];
-
-const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
-if (missingEnvVars.length > 0) {
-  const errorMessage = `Missing required environment variables: ${missingEnvVars.join(', ')}`;
-  logger.error(errorMessage);
-  throw new Error(errorMessage);
-}
-
-
-// Initialize Azure AD credentials
-const credential = new ClientSecretCredential(
-  process.env.APP_TENANT_ID!,
-  process.env.APP_CLIENT_ID!,
-  process.env.APP_CLIENT_SECRET! 
-);
-
-
-// Initialize the Cosmos Client with error handling
-let client: CosmosClient;
-try {
-  client = new CosmosClient({
-    endpoint: `https://${process.env.AZURE_COSMOSDB_ACCOUNT}.documents.azure.com:443/`,
-    aadCredentials: credential
-  });
-
-  const database = client.database(process.env.AZURE_COSMOSDB_DATABASE!);
-  const container = database.container(process.env.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER!);
-
-  // Log successful Cosmos Client connection
-  logger.debug(`Cosmos Client connected successfully to database: ${process.env.AZURE_COSMOSDB_DATABASE}, container: ${process.env.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER}`);
-} catch (error) {
-  const errorMessage = `Failed to initialize Cosmos Client: ${error instanceof Error ? error.message : String(error)}`;
-  logger.error(errorMessage);
-  throw error;
-}
+import { getCosmosClient } from '@/lib/cosmos';
 
 export async function GET(request: Request) {
+  const client = getCosmosClient();
   const { searchParams } = new URL(request.url);
   logger.info(`请求URL: ${request.url}`);
   const product = searchParams.get('product');
@@ -258,3 +185,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const dynamic = 'force-dynamic';

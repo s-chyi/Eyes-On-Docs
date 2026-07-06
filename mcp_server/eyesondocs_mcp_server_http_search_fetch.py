@@ -4,10 +4,15 @@ from mcp.server.fastmcp import FastMCP
 import os
 
 # 初始化FastMCP服务器
-mcp = FastMCP("doc_updates")
+# host/port 走 env var（FASTMCP_HOST / FASTMCP_PORT），在 ACA 內綁 0.0.0.0:8000 讓 ingress 進得來
+mcp = FastMCP(
+    "doc_updates",
+    host=os.environ.get("FASTMCP_HOST", "0.0.0.0"),
+    port=int(os.environ.get("FASTMCP_PORT", "8000")),
+)
 
 # 常量
-API_BASE = "https://docs.westiedoubao.com/api"
+API_BASE = os.environ.get("API_BASE", "https://docs.westiedoubao.com/api")
 USER_AGENT = "doc-updates-app/1.0"
 DEFAULT_PRODUCTS = [
     "Microsoft-Foundry",
@@ -34,6 +39,7 @@ DEFAULT_PRODUCTS = [
 
 async def make_api_request(url: str, extra_headers: Optional[dict[str, str]] = None) -> dict[str, Any] | None:
     """向API发送请求，并进行适当的错误处理。"""
+    print(f"[mcp outbound] GET {url}", flush=True)
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": "application/json"
@@ -359,22 +365,23 @@ async def search(query: str) -> str:
 async def fetch(id: str) -> str:
     """
     Retrieve a documentation update by ID returned from search.
-    
+
     Args:
-        id: The update ID. Prefer the "product:update_id" format returned by search.
+        id: The update ID. Must use the "product:update_id" format returned by search.
     """
     update_id = id.strip()
     if not update_id:
         return "请输入要获取的更新 ID。"
 
-    products = await get_products()
-    requested_product = None
-    if ":" in update_id:
-        requested_product, update_id = update_id.split(":", 1)
-        products = [requested_product]
+    # 沒有 product prefix 直接拒絕，避免 fanning out 到 20 products × 10 pages × 30s timeout（超過 ACA 240s idle）
+    if ":" not in update_id:
+        return "无效的 ID 格式。请使用 search 回傳的 \"product:update_id\" 格式。"
+
+    requested_product, update_id = update_id.split(":", 1)
+    products = [requested_product]
 
     for product in products:
-        for page in range(1, 11):
+        for page in range(1, 4):  # 最多 3 頁，配合 ACA idle timeout
             url = f"{API_BASE}/updates?product={product}&language=Chinese&page={page}&updateType=single"
             data = await make_api_request(url)
 
@@ -385,8 +392,7 @@ async def fetch(id: str) -> str:
                 if update.get("id") == update_id:
                     return format_search_update(product, update)
 
-    product_hint = f"产品={requested_product}，" if requested_product else ""
-    return f"未找到更新：{product_hint}ID={update_id}。"
+    return f"未找到更新：产品={requested_product}，ID={update_id}。"
 
 if __name__ == "__main__":
     # 运行 HTTP streamable 服务器
