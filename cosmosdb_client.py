@@ -127,11 +127,26 @@ class CosmosDBHandler:
         time_now_utc = datetime.datetime.utcfromtimestamp(time_now_struct)
   
         # 情况1：数据库和本地文件都没有记录
-        if lastest_commit_time_in_cosmosdb is None and time_in_last_crawl_time_txt is None:  
-            # 使用当前时间作为起始时间，并写入本地文件保存
-            self.write_time(time_now_utc)  
-            logger.warning(f"No Commit in cosmosdb! Use current time as start time: {time_now_utc}")  
-            return time_now  
+        if lastest_commit_time_in_cosmosdb is None and time_in_last_crawl_time_txt is None:
+            # 首次 poll 此 (topic, language, root_commits_url) 組合。default 用當前時間、
+            # 會漏抓 launch time 之前的 commit（例如 URL 切換或加新 topic 場景）。
+            # BACKFILL_ON_FIRST_POLL_DAYS env 可拉回 N 天當 safety net：
+            #   1 = 1 天前, 3 = 3 天前, 0 或未設 = 沿用 launch time (legacy)
+            # 拉回範圍不宜太大（每筆會跑 GPT），3 天內 4 個 commit 級別。
+            backfill_days_raw = os.getenv("BACKFILL_ON_FIRST_POLL_DAYS", "0").strip()
+            try:
+                backfill_days = int(backfill_days_raw)
+            except ValueError:
+                backfill_days = 0
+            if backfill_days > 0:
+                effective_start = time_now_utc - datetime.timedelta(days=backfill_days)
+                self.write_time(effective_start)
+                logger.warning(f"No Commit in cosmosdb! BACKFILL_ON_FIRST_POLL_DAYS={backfill_days} → start time: {effective_start} (was current time {time_now_utc})")
+                return effective_start
+            # legacy 行為（Joey VM default）
+            self.write_time(time_now_utc)
+            logger.warning(f"No Commit in cosmosdb! Use current time as start time: {time_now_utc}")
+            return time_now
         # 情况2：只有本地文件有记录
         elif lastest_commit_time_in_cosmosdb == None and time_in_last_crawl_time_txt != None:
             logger.warning(f"No Commit in cosmosdb! Use last_crawl_time.txt as start time: {time_in_last_crawl_time_txt}")

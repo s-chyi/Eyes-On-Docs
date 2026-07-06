@@ -152,42 +152,43 @@ class CosmosConversationClient:
     def get_lastest_commit(self, topic, language, root_commits_url, sort_order = 'DESC'):
         """
         获取最新的commit记录
-        
-        查询数据库中指定主题、语言和URL的最新commit记录，
-        用于确定下次处理的起始时间点。
-        
+
+        查询数据库中指定主题、语言的最新commit记录，用于确定下次处理的起始时间点。
+
         Args:
             topic (str): 主题名称
             language (str): 语言
-            root_commits_url (str): commit根URL
+            root_commits_url (str): commit根URL (legacy 參數，見 CROSS_URL_START_TIME 說明)
             sort_order (str): 排序方式，默认降序
-            
+
         Returns:
             dict/None: 最新的commit记录，如果没有则返回None
+
+        Cross-URL start_time (2026-07-06 加入):
+            CROSS_URL_START_TIME=1 env → query 只用 (topic, language)、不 filter root_commits_url。
+            設計目的：URL 切換（例如 azure-ai-docs → azure-ai-docs-pr）時、仍能用舊 URL 的
+            commit_time 作為新 URL 的 start_time、避免 launch time 之前的 commit 被漏抓。
+            default (未設 env) 走 legacy 三欄 exact match，Joey VM 相容不變。
         """
-        # 构建查询参数
-        parameters = [
-            {
-                'name': '@topic',
-                'value': topic
-            },
-            {
-                'name': '@language',
-                'value': language
-            },
-            {
-                'name': '@root_commits_url',
-                'value': root_commits_url
-            }
-        ]
-        
-        # 构建查询语句，获取最新的一条记录
-        query = f"SELECT TOP 1 * FROM c where c.topic = @topic and c.root_commits_url = @root_commits_url and c.language = @language order by c.commit_time {sort_order}"
-        
-        # 执行查询
-        lastest_commit = list(self.container_client.query_items(query=query, parameters=parameters,
-                                                                               enable_cross_partition_query =True))
-        ## 如果没有找到记录，返回None
+        cross_url = os.getenv("CROSS_URL_START_TIME", "").strip() in ("1", "true", "True")
+
+        if cross_url:
+            parameters = [
+                {'name': '@topic', 'value': topic},
+                {'name': '@language', 'value': language},
+            ]
+            query = f"SELECT TOP 1 * FROM c where c.topic = @topic and c.language = @language order by c.commit_time {sort_order}"
+        else:
+            parameters = [
+                {'name': '@topic', 'value': topic},
+                {'name': '@language', 'value': language},
+                {'name': '@root_commits_url', 'value': root_commits_url},
+            ]
+            query = f"SELECT TOP 1 * FROM c where c.topic = @topic and c.root_commits_url = @root_commits_url and c.language = @language order by c.commit_time {sort_order}"
+
+        lastest_commit = list(self.container_client.query_items(
+            query=query, parameters=parameters, enable_cross_partition_query=True,
+        ))
         if len(lastest_commit) == 0:
             return None
         else:
