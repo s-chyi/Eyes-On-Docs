@@ -11,7 +11,8 @@ RUN apt-get update \
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    RUN_ONCE=1
 
 WORKDIR /app
 
@@ -30,6 +31,7 @@ COPY eyes_on_docs.py \
      cosmosdbservice.py \
      gpt_reply.py \
      include_link_resolver.py \
+     live_sweeper.py \
      logs.py \
      teams_notifier.py \
      prompts.toml \
@@ -37,5 +39,6 @@ COPY eyes_on_docs.py \
      target_config-nick-smoke.json \
      ./
 
-# ACA Job 執行一次 process_targets 就 exit(0)
+# ACA Job 執行一次 process_targets 就 exit(0)（靠 ENV RUN_ONCE=1）
+# Joey VM systemd 走 legacy while-loop：不設 RUN_ONCE、預設 loop mode
 CMD ["python", "-u", "eyes_on_docs.py"]

@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import toml
 import datetime
 from dotenv import load_dotenv
@@ -112,16 +113,17 @@ def process_targets(targets):
             logger.exception("Unexpected exception:", e) 
     return git_spyder.schedule
 
-def main():
+def _run_once():
     """
-    執行一次爬取檢測。
-    排程由外部 (ACA Job cron: 0 */2 * * *) 接管，本進程跑完 process_targets 就 exit(0)。
+    執行一輪爬取 + live sweep。ACA Job mode 與 while-loop mode 共用此函式，
+    確保兩種部署下行為一致。
     """
     targets = load_targets_config()
     try:
-        process_targets(targets)
+        schedule = process_targets(targets)
     except Exception as e:
         logger.exception("Unexpected exception:", e)
+        schedule = 7200  # fallback：兩小時，避免 while loop 撞 UnboundLocalError
 
     try:
         handler = CosmosDBHandler()
@@ -130,6 +132,31 @@ def main():
             sweep_live_status(client)
     except Exception as e:
         logger.exception("live-sweeper failed at top level", e)
+
+    return schedule
+
+
+def main():
+    """
+    RUN_ONCE=1 (ACA Job mode)：跑一次就 exit，排程由 ACA cron 接管。
+    default (Joey VM systemd)：保留 while loop，內部 sleep(schedule) 節奏跑。
+    """
+    run_once = os.environ.get("RUN_ONCE", "").strip() in ("1", "true", "True")
+
+    if run_once:
+        logger.warning("RUN_ONCE mode: single execution, exit(0) after done")
+        _run_once()
+        return
+
+    logger.warning("Loop mode: continuously running (Joey VM systemd default)")
+    while True:
+        try:
+            schedule = _run_once()
+            logger.warning(f"Waiting for {schedule} seconds")
+            time.sleep(schedule)
+        except Exception as e:
+            logger.exception("Unexpected exception in main loop:", e)
+            time.sleep(300)
 
 if __name__ == "__main__":
     main()
