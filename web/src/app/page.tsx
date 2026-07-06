@@ -80,7 +80,9 @@ async function getUpdates(product: string, language: string, page: number, updat
         timestamp: update.timestamp,
         commitUrl: update.commitUrl,
         gptSummary: update.gptSummary, // Explicitly pass gptSummary
-        tag: update.tag // Add tag property
+        tag: update.tag, // Add tag property
+        liveStatus: update.liveStatus,
+        wentLiveAt: update.wentLiveAt,
       };
     });
 
@@ -110,6 +112,8 @@ interface Update {
   commitUrl: string;
   gptSummary?: string;
   tag?: string; // Add tag property
+  liveStatus?: 'pending' | 'live' | 'unknown';
+  wentLiveAt?: string | null;
 }
 
 export default function Home({ searchParams }: { searchParams: { product?: string; language?: string; page?: string; updateType?: string } }) {
@@ -311,6 +315,8 @@ export default function Home({ searchParams }: { searchParams: { product?: strin
                   timestamp={update.timestamp}
                   commitUrl={update.commitUrl}
                   gptSummary={update.gptSummary}
+                  liveStatus={update.liveStatus}
+                  wentLiveAt={update.wentLiveAt}
                 />
               ))}
             </div>

@@ -14,15 +14,19 @@ interface UpdateCardProps {
   timestamp: string;
   commitUrl: string;
   gptSummary?: string;
+  liveStatus?: 'pending' | 'live' | 'unknown';
+  wentLiveAt?: string | null;
 }
 
-export default function UpdateCard({ 
-  id, 
-  title, 
+export default function UpdateCard({
+  id,
+  title,
   tag,
-  timestamp, 
+  timestamp,
   commitUrl,
-  gptSummary
+  gptSummary,
+  liveStatus,
+  wentLiveAt,
 }: UpdateCardProps) {
   const [maxHeight, setMaxHeight] = useState('5rem'); // 初始高度对应5行
   const [isExpanded, setIsExpanded] = useState(false);
@@ -96,6 +100,22 @@ export default function UpdateCard({
           {tag && (
             <span className="bg-accent-secondary text-black px-2 py-0.5 rounded-md text-xs font-semibold">
               {tag}
+            </span>
+          )}
+          {liveStatus === 'live' && (
+            <span
+              className="bg-green-600/30 text-green-300 border border-green-500/50 px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap"
+              title={wentLiveAt ? `Live since ${new Date(wentLiveAt).toLocaleString()}` : 'Live on learn.microsoft.com'}
+            >
+              Live
+            </span>
+          )}
+          {liveStatus === 'pending' && (
+            <span
+              className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap"
+              title="Merged to docs staging (main branch) — not yet published to learn.microsoft.com"
+            >
+              Pending live
             </span>
           )}
           <h2 className="text-xl text-yellow-400 break-words flex-grow">{title}</h2>

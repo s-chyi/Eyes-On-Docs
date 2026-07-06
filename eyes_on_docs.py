@@ -1,14 +1,15 @@
-import json  
-import time  
-import toml  
+import json
+import os
+import toml
 import datetime
-from dotenv import load_dotenv  
-from threading import Thread
+from dotenv import load_dotenv
 
-  
-from logs import logger  
-from gpt_reply import *  
-from spyder import *  
+
+from logs import logger
+from gpt_reply import *
+from spyder import *
+from live_sweeper import sweep_live_status
+from cosmosdb_client import CosmosDBHandler
 
 load_dotenv(override=True)  # 允许覆盖环境变量
   
@@ -32,12 +33,14 @@ def load_system_prompts(target):
         system_prompt.update({k: data[system_prompt[k]]['prompt'] })
     return system_prompt
   
-def load_targets_config(): 
+def load_targets_config():
     """
     讀取目標主題、爬取的root Url、顯示語言、推送到teams的channel webhook
-    """ 
-    with open('target_config.json', 'r') as f:  
-        return json.load(f)  
+    可用 TARGET_CONFIG_PATH env 覆蓋預設路徑 (ACA smoke test 用 Nick-only config)
+    """
+    config_path = os.environ.get('TARGET_CONFIG_PATH', 'target_config.json')
+    with open(config_path, 'r') as f:
+        return json.load(f)
   
 def process_targets(targets):
     """
@@ -111,17 +114,22 @@ def process_targets(targets):
 
 def main():
     """
-    以循環方式固定時間爬取一次檢測是否有文檔更新
+    執行一次爬取檢測。
+    排程由外部 (ACA Job cron: 0 */2 * * *) 接管，本進程跑完 process_targets 就 exit(0)。
     """
-    targets = load_targets_config()  
-  
-    while True:  
-        try:  
-            schedule = process_targets(targets)  
-            logger.warning(f"Waiting for {schedule} seconds")  
-            time.sleep(schedule)  
-        except Exception as e:  
-            logger.exception("Unexpected exception:", e)  
-  
-if __name__ == "__main__":   
+    targets = load_targets_config()
+    try:
+        process_targets(targets)
+    except Exception as e:
+        logger.exception("Unexpected exception:", e)
+
+    try:
+        handler = CosmosDBHandler()
+        client = handler.initialize_cosmos_client()
+        if client is not None:
+            sweep_live_status(client)
+    except Exception as e:
+        logger.exception("live-sweeper failed at top level", e)
+
+if __name__ == "__main__":
     main()

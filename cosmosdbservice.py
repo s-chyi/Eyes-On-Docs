@@ -193,6 +193,64 @@ class CosmosConversationClient:
         else:
             return lastest_commit[0]
 
+    def get_pending_live_commits(self, repo_full_name):
+        """
+        取回所有 live_status='pending' 且 commit_sha 非空、且 root_commits_url 屬於指定 repo 的 doc。
+        用於 sweeper：每輪 monitor 執行時掃 pending，比對 sha 是否已上 live 分支。
+
+        Args:
+            repo_full_name (str): e.g. "MicrosoftDocs/azure-ai-docs-pr"
+
+        Returns:
+            list[dict]: [{id, commit_sha, root_commits_url, ...}, ...]
+        """
+        query = (
+            "SELECT c.id, c.commit_sha, c.root_commits_url, c.topic, c.language "
+            "FROM c "
+            "WHERE c.live_status = 'pending' "
+            "AND IS_DEFINED(c.commit_sha) AND c.commit_sha != '' "
+            "AND CONTAINS(c.root_commits_url, @repo)"
+        )
+        params = [{"name": "@repo", "value": repo_full_name}]
+        return list(self.container_client.query_items(
+            query=query,
+            parameters=params,
+            enable_cross_partition_query=True,
+        ))
+
+    def mark_commits_live(self, doc_ids, went_live_at):
+        """
+        把一批 doc 從 pending 翻成 live。用 upsert 策略（read → mutate → upsert）
+        以避免和 monitor write path 競爭；每筆單獨處理，一筆失敗不影響其他。
+
+        Args:
+            doc_ids (list[str]): 要標 live 的 doc id list
+            went_live_at (str): ISO timestamp 字串
+
+        Returns:
+            int: 成功更新的筆數
+        """
+        updated = 0
+        for doc_id in doc_ids:
+            try:
+                query = "SELECT * FROM c WHERE c.id = @id"
+                params = [{"name": "@id", "value": doc_id}]
+                items = list(self.container_client.query_items(
+                    query=query,
+                    parameters=params,
+                    enable_cross_partition_query=True,
+                ))
+                if not items:
+                    continue
+                doc = items[0]
+                doc["live_status"] = "live"
+                doc["went_live_at"] = went_live_at
+                self.container_client.upsert_item(doc)
+                updated += 1
+            except Exception:
+                continue
+        return updated
+
     def get_commit_history(self):
         """
         获取所有commit历史记录

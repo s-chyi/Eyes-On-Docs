@@ -205,7 +205,9 @@ export async function GET(request: Request) {
           title: title,
           gptSummary: gptSummary,
           timestamp: update.commit_time,
-          commitUrl: update.commit_url
+          commitUrl: update.commit_url,
+          liveStatus: update.live_status ?? 'unknown',
+          wentLiveAt: update.went_live_at ?? null,
         };
       });
 

@@ -418,16 +418,23 @@ class Spyder(CommitFetcher, CallGPT, TeamsNotifier):
             post_status (str, optional): Teams消息发送状态（'success', 'failed'）
             error_message (str, optional): 错误消息（如果有）
         """
-        self.update_commit_history("commit_time", str(commit_time)) 
-        self.update_commit_history("commit_url", str(commit_url)) 
-        self.update_commit_history("status", status) 
-        self.update_commit_history("topic", self.topic) 
-        self.update_commit_history("language", self.language) 
-        self.update_commit_history("root_commits_url", self.root_commits_url) 
+        self.update_commit_history("commit_time", str(commit_time))
+        self.update_commit_history("commit_url", str(commit_url))
+        self.update_commit_history("status", status)
+        self.update_commit_history("topic", self.topic)
+        self.update_commit_history("language", self.language)
+        self.update_commit_history("root_commits_url", self.root_commits_url)
         self.update_commit_history("teams_message_webhook_url", self.teams_webhook_url)
-        self.update_commit_history("teams_message_jsondata", teams_message_jsondata) 
-        self.update_commit_history("post_status", post_status) 
-        self.update_commit_history("error_message", error_message) 
+        self.update_commit_history("teams_message_jsondata", teams_message_jsondata)
+        self.update_commit_history("post_status", post_status)
+        self.update_commit_history("error_message", error_message)
+
+        commit_sha = ""
+        if commit_url and "/commit/" in commit_url:
+            commit_sha = commit_url.rsplit("/commit/", 1)[-1].split("?")[0].split("#")[0]
+        self.update_commit_history("commit_sha", commit_sha)
+        self.update_commit_history("live_status", "pending" if commit_sha else "unknown")
+        self.update_commit_history("went_live_at", None)
 
     def update_commit_history(self, key, value):  
         """  

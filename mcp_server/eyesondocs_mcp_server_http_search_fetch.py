@@ -50,12 +50,26 @@ async def make_api_request(url: str, extra_headers: Optional[dict[str, str]] = N
             # print("DEBUG: exception:", e)
             return {"error": str(e)}
 
+def _format_live_status(update: dict) -> str:
+    """把 live_status/wentLiveAt 轉為人可讀的一行文字。"""
+    status = update.get("liveStatus")
+    if status == "live":
+        went = update.get("wentLiveAt")
+        if went:
+            return f"已发布到 learn.microsoft.com (自 {went})"
+        return "已发布到 learn.microsoft.com"
+    if status == "pending":
+        return "尚未发布到 learn.microsoft.com（仅已 merge 到文档 staging 分支）"
+    return "发布状态未知"
+
+
 def format_update(update: dict) -> str:
     """将更新数据格式化为可读字符串。"""
     return f"""
 标签: {update.get('tag', '无标签')}
 标题: {update.get('title', '无标题')}
 时间: {update.get('timestamp', '未知时间')}
+发布状态: {_format_live_status(update)}
 摘要: {update.get('gptSummary', '无摘要')}
 提交链接: {update.get('commitUrl', '无链接')}
 """
@@ -69,6 +83,7 @@ ID: {product}:{update_id}
 标签: {update.get('tag', '无标签')}
 标题: {update.get('title', '无标题')}
 时间: {update.get('timestamp', '未知时间')}
+发布状态: {_format_live_status(update)}
 摘要: {update.get('gptSummary', '无摘要')}
 提交链接: {update.get('commitUrl', '无链接')}
 """

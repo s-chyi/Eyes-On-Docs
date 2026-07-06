@@ -1,7 +1,6 @@
 import winston from 'winston';
-import 'winston-daily-rotate-file';
 
-// 自定义日志格式
+// 自定义日志格式（JSON single-line，讓 Log Analytics 好 parse）
 const logFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
@@ -20,40 +19,13 @@ const logFormat = winston.format.combine(
   })
 );
 
-// 日志轮转配置
-const dailyRotateFileTransport = new winston.transports.DailyRotateFile({
-  filename: 'logs/combined-%DATE%.log',
-  datePattern: 'YYYY-MM-DD',
-  maxSize: '20m',
-  maxFiles: '14d',
-  format: logFormat
-});
-
-const errorRotateFileTransport = new winston.transports.DailyRotateFile({
-  filename: 'logs/error-%DATE%.log',
-  datePattern: 'YYYY-MM-DD',
-  maxSize: '20m',
-  maxFiles: '14d',
-  level: 'error',
-  format: logFormat
-});
-
-// 创建logger实例
+// ACA container stdout/stderr 會自動被 Log Analytics 收走，容器內不再寫檔案
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: logFormat,
   transports: [
-    dailyRotateFileTransport,
-    errorRotateFileTransport
+    new winston.transports.Console({
+      format: logFormat
+    })
   ]
 });
-
-// 开发环境下添加控制台输出
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    )
-  }));
-}
