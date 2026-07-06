@@ -41,6 +41,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Write gitignored target_config files from secrets
+        # target_config.json + target_config-nick-smoke.json are gitignored
+        # (Nick-only, contain Teams webhooks etc). Dockerfile COPY expects them
+        # at the repo root, so materialize them into the runner's checkout.
+        run: |
+          printf '%s' '${{ secrets.TARGET_CONFIG_JSON }}' > target_config.json
+          printf '%s' '${{ secrets.TARGET_CONFIG_NICK_SMOKE_JSON }}' > target_config-nick-smoke.json
+          # Validate JSON so a broken secret fails fast, not deep in docker build
+          python3 -c "import json; json.load(open('target_config.json')); json.load(open('target_config-nick-smoke.json')); print('config json valid')"
+
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
