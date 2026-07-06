@@ -1,0 +1,48 @@
+# Dockerfile.web — Next.js 14 web (standalone output) for ACA Container App
+# Build context: repo root (so we can copy target_config.json into /app/config)
+# Usage: docker build -f Dockerfile.web --build-arg NEXT_PUBLIC_GA_ID=<id> .
+
+# ---------- deps ----------
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+
+# ---------- builder ----------
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY web/ ./
+
+# GA_ID 必須在 build time 提供（NEXT_PUBLIC_* 會被 inline 進 bundle）
+ARG NEXT_PUBLIC_GA_ID=""
+ENV NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN npm run build
+
+# ---------- runner ----------
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=10086 \
+    HOSTNAME=0.0.0.0
+
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
+
+# standalone output 已把必要 node_modules 打包進 /app
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# 把 target_config.json 烤進 image 到穩定路徑，容器內以 TARGET_CONFIG_PATH 指過來
+COPY --chown=nextjs:nodejs target_config.json /app/config/target_config.json
+ENV TARGET_CONFIG_PATH=/app/config/target_config.json
+
+USER nextjs
+EXPOSE 10086
+
+CMD ["node", "server.js"]

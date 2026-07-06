@@ -1,0 +1,64 @@
+# .dockerignore — 縮小 Docker build context
+
+# Secrets & local envs
+.env
+.env.*
+!.env.example
+web/.env.local
+web/.env.*.local
+
+# VCS / IDE / build metadata
+.git
+.github
+.gitignore
+.gitattributes
+.claude
+.vscode
+.idea
+
+# Python artifacts
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+*.egg-info
+.venv
+venv
+
+# Node / Next.js
+web/node_modules
+web/.next
+web/out
+web/build
+web/.vercel
+web/coverage
+web/*.tsbuildinfo
+
+# Logs & runtime state
+logs
+web/logs
+last_crawl_time.txt
+include_link_cache.json
+change_history
+
+# Docs / assets not needed inside image
+README.md
+AGENTS.md
+Architecture.md
+GPT_ANALYSIS_MODES.md
+CLAUDE.md
+guide_original.md
+image
+images
+docs
+archived
+examples
+test
+mcp_server/openapi.json
+mcp_server/test_*.py
+
+# Docker meta
+Dockerfile*
+.dockerignore
