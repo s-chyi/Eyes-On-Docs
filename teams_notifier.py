@@ -1,8 +1,14 @@
+import os
 import requests
-from logs import logger  
+from logs import logger
 
 class TeamsNotifier:
     def post_teams_message(self, title, time, summary, teams_webhook_url, commit_url=None):
+        # Kill switch: 測試期完全禁止推 Teams (ACA parity smoke test 用)
+        # 保持 3-element list 回傳形狀給 spyder.py process_commits() unpacking
+        if os.environ.get('DISABLE_TEAMS_WEBHOOK') == '1':
+            logger.warning("Teams disabled by DISABLE_TEAMS_WEBHOOK env var")
+            return [None, "disabled", "kill_switch"]
         if commit_url:
             message_data = {
                 "@type": "MessageCard",

@@ -7,11 +7,12 @@ import os
 mcp = FastMCP("doc_updates")
 
 # 常量
-API_BASE = "https://docs.westiedoubao.com/api"
+API_BASE = os.environ.get("API_BASE", "https://docs.westiedoubao.com/api")
 USER_AGENT = "doc-updates-app/1.0"
 
 async def make_api_request(url: str, extra_headers: Optional[dict[str, str]] = None) -> dict[str, Any] | None:
     """向API发送请求，并进行适当的错误处理。"""
+    print(f"[mcp outbound] GET {url}", flush=True)
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": "application/json"
