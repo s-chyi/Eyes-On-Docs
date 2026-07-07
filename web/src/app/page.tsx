@@ -340,14 +340,29 @@ export default function Home({ searchParams }: { searchParams: { product?: strin
       <footer className="mt-12 text-center text-text-secondary text-sm">
         <div className="border-t border-accent-secondary/30 pt-6">
           <p>
-            🚀 Created by <span className="font-bold text-accent-secondary">Joey Zeng</span> • 
-            <a 
-              href="mailto:zehua@microsoft.com" 
+            🚀 Created by <span className="font-bold text-accent-secondary">Nick Shieh</span> •
+            <a
+              href="mailto:nickshieh@microsoft.com"
               className="
                 ml-2
-                hover:text-accent-secondary 
-                transition-colors 
-                duration-300 
+                hover:text-accent-secondary
+                transition-colors
+                duration-300
+                underline
+                hover:no-underline
+              "
+            >
+              nickshieh@microsoft.com
+            </a>
+            {' • '}
+            <span className="font-bold text-accent-secondary">Joey Zeng</span> •
+            <a
+              href="mailto:zehua@microsoft.com"
+              className="
+                ml-2
+                hover:text-accent-secondary
+                transition-colors
+                duration-300
                 underline
                 hover:no-underline
               "
