@@ -1,22 +1,37 @@
 # .github/workflows/aca-deploy.yml
 # Deploys eyes-on-docs 三個元件（web / mcp / monitor）到 Azure Container Apps。
-# Auth: OIDC federated credential 走 Entra app sp-github-oidc-eyesondocs（Nick fork）。
+# Auth: OIDC federated credential 走 UAMI；每個 target env 有各自 UAMI + federated cred。
+#
+# 支援兩個 target env：
+#   - prod (default)  → Nick sub, 走 repo-level vars/secrets (no environment binding)
+#   - non-prod        → corp non-prod sub, 走 GH Environment 'non-prod' 的 vars/secrets
 #
 # 需要在 GitHub repo 設定：
-#   Variables:  AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
-#               ACR_NAME, RESOURCE_GROUP, ACA_ENVIRONMENT,
-#               WEB_APP_NAME, MCP_APP_NAME, MONITOR_JOB_NAME,
-#               WEB_FQDN (smoke test)
-#   Secrets:    NEXT_PUBLIC_GA_ID (build-time inline, not sensitive but repo-specific)
+#   Repo-level (prod) Variables:
+#     AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#     ACR_NAME, RESOURCE_GROUP, ACA_ENVIRONMENT,
+#     WEB_APP_NAME, MCP_APP_NAME, MONITOR_JOB_NAME, WEB_FQDN
+#   Repo-level (prod) Secrets:
+#     NEXT_PUBLIC_GA_ID, TARGET_CONFIG_JSON, TARGET_CONFIG_NICK_SMOKE_JSON
+#
+#   Environment 'non-prod' (env-scoped) Variables + Secrets — 同上一組 key、但值指 corp non-prod。
+#   Plus non-prod env-scoped secrets for runtime env (Cosmos/AOAI/SP/PAT) — 這組 prod 那邊沒用到
+#   (prod monitor Job 的 env 是 az cli 直接 set，非透過 CI；non-prod 我們讓 CI 補上)。
 
 name: aca-deploy
 
-# 只允許手動觸發 (workflow_dispatch)、不 push-triggered。
-# 原因：這個 workflow 綁 s-chyi UAMI 的 federated credential + Nick 的 GitHub Variables,
-# push 到 master 自動 fire 會誤觸發 production deploy。
-# 需要 rollout 時到 Actions UI 點 Run workflow、或用 gh workflow run aca-deploy.yml
+# 只允許手動觸發、選 target env
 on:
   workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target environment'
+        type: choice
+        required: true
+        default: 'prod'
+        options:
+          - prod
+          - non-prod
 
 permissions:
   id-token: write   # OIDC
@@ -28,6 +43,9 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # 綁 GH Environment 讓 env-scoped vars/secrets 疊上 repo-level（env 值優先）
+    # target_env='prod' 綁 'prod' env — 若不存在則 fallback 拿 repo-level（無 GH 檢查會通過）
+    environment: ${{ inputs.target_env }}
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +92,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    environment: ${{ inputs.target_env }}
     steps:
       - uses: actions/checkout@v4
 
@@ -108,6 +127,11 @@ jobs:
       - name: Smoke test (web)
         run: |
           # /api/products 有 fallback branch，即使 config 缺也 return 200 → 適合 readiness
+          # 若 WEB_FQDN 尚未填(首次部 non-prod)、skip smoke。
+          if [ "${{ vars.WEB_FQDN }}" = "TBD-after-first-deploy" ] || [ -z "${{ vars.WEB_FQDN }}" ]; then
+            echo "WEB_FQDN not set yet (first deploy?); skipping smoke test"
+            exit 0
+          fi
           for i in 1 2 3 4 5; do
             if curl -fsS -o /dev/null "https://${{ vars.WEB_FQDN }}/api/products"; then
               echo "web smoke ok"
