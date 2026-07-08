@@ -103,26 +103,151 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Update web app
+      # 冪等部署：資源存在 → 只 update image；資源不存在 → 完整 create 帶 env/secrets/scale/ingress
+      # 完整 create 只在 bootstrap（e.g. non-prod env 重建後首次部署）走一次
+      #
+      # UAMI resource id：用 AZURE_CLIENT_ID(UAMI clientId) 反查
+      - name: Resolve UAMI resource id
+        id: uami
         run: |
-          az containerapp update \
-            --name ${{ vars.WEB_APP_NAME }} \
-            --resource-group ${{ vars.RESOURCE_GROUP }} \
-            --image ${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-web:${IMAGE_TAG}
+          UAMI_ID=$(az identity list -g ${{ vars.RESOURCE_GROUP }} \
+            --query "[?clientId=='${{ vars.AZURE_CLIENT_ID }}'].id | [0]" -o tsv)
+          if [ -z "$UAMI_ID" ]; then
+            echo "!! could not resolve UAMI id for client ${{ vars.AZURE_CLIENT_ID }}"; exit 1
+          fi
+          echo "uami_id=$UAMI_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Update mcp app
+      - name: Deploy web app (create-or-update)
         run: |
-          az containerapp update \
-            --name ${{ vars.MCP_APP_NAME }} \
-            --resource-group ${{ vars.RESOURCE_GROUP }} \
-            --image ${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-mcp:${IMAGE_TAG}
+          IMAGE="${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-web:${IMAGE_TAG}"
+          if az containerapp show -n ${{ vars.WEB_APP_NAME }} -g ${{ vars.RESOURCE_GROUP }} >/dev/null 2>&1; then
+            echo "web exists — updating image only"
+            az containerapp update \
+              --name ${{ vars.WEB_APP_NAME }} \
+              --resource-group ${{ vars.RESOURCE_GROUP }} \
+              --image "$IMAGE"
+          else
+            echo "web missing — full create"
+            # secrets first, then env vars referencing them
+            az containerapp create \
+              --name ${{ vars.WEB_APP_NAME }} \
+              --resource-group ${{ vars.RESOURCE_GROUP }} \
+              --environment ${{ vars.ACA_ENVIRONMENT }} \
+              --image "$IMAGE" \
+              --user-assigned "${{ steps.uami.outputs.uami_id }}" \
+              --registry-server ${{ vars.ACR_NAME }}.azurecr.io \
+              --registry-identity "${{ steps.uami.outputs.uami_id }}" \
+              --ingress external --target-port 10086 --transport auto \
+              --min-replicas 0 --max-replicas 2 \
+              --cpu 0.5 --memory 1Gi \
+              --secrets \
+                app-tenant-id="${{ secrets.APP_TENANT_ID }}" \
+                app-client-id="${{ secrets.APP_CLIENT_ID }}" \
+                app-client-secret="${{ secrets.APP_CLIENT_SECRET }}" \
+                cosmos-account="${{ secrets.AZURE_COSMOSDB_ACCOUNT }}" \
+                cosmos-db="${{ secrets.AZURE_COSMOSDB_DATABASE }}" \
+                cosmos-container="${{ secrets.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER }}" \
+                cosmos-usertraffic="${{ secrets.AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER }}" \
+                nextauth-secret="${{ secrets.NEXTAUTH_SECRET }}" \
+              --env-vars \
+                APP_TENANT_ID=secretref:app-tenant-id \
+                APP_CLIENT_ID=secretref:app-client-id \
+                APP_CLIENT_SECRET=secretref:app-client-secret \
+                AZURE_COSMOSDB_ACCOUNT=secretref:cosmos-account \
+                AZURE_COSMOSDB_DATABASE=secretref:cosmos-db \
+                AZURE_COSMOSDB_CONVERSATIONS_CONTAINER=secretref:cosmos-container \
+                AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER=secretref:cosmos-usertraffic \
+                NEXTAUTH_SECRET=secretref:nextauth-secret \
+                NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}" \
+                LOG_TO_STDOUT_ONLY=1
+          fi
 
-      - name: Update monitor job
+      - name: Deploy mcp app (create-or-update)
         run: |
-          az containerapp job update \
-            --name ${{ vars.MONITOR_JOB_NAME }} \
-            --resource-group ${{ vars.RESOURCE_GROUP }} \
-            --image ${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-monitor:${IMAGE_TAG}
+          IMAGE="${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-mcp:${IMAGE_TAG}"
+          if az containerapp show -n ${{ vars.MCP_APP_NAME }} -g ${{ vars.RESOURCE_GROUP }} >/dev/null 2>&1; then
+            echo "mcp exists — updating image only"
+            az containerapp update \
+              --name ${{ vars.MCP_APP_NAME }} \
+              --resource-group ${{ vars.RESOURCE_GROUP }} \
+              --image "$IMAGE"
+          else
+            echo "mcp missing — full create"
+            az containerapp create \
+              --name ${{ vars.MCP_APP_NAME }} \
+              --resource-group ${{ vars.RESOURCE_GROUP }} \
+              --environment ${{ vars.ACA_ENVIRONMENT }} \
+              --image "$IMAGE" \
+              --user-assigned "${{ steps.uami.outputs.uami_id }}" \
+              --registry-server ${{ vars.ACR_NAME }}.azurecr.io \
+              --registry-identity "${{ steps.uami.outputs.uami_id }}" \
+              --ingress external --target-port 8000 --transport auto \
+              --min-replicas 0 --max-replicas 2 \
+              --cpu 0.5 --memory 1Gi \
+              --secrets \
+                app-tenant-id="${{ secrets.APP_TENANT_ID }}" \
+                app-client-id="${{ secrets.APP_CLIENT_ID }}" \
+                app-client-secret="${{ secrets.APP_CLIENT_SECRET }}" \
+                cosmos-account="${{ secrets.AZURE_COSMOSDB_ACCOUNT }}" \
+                cosmos-db="${{ secrets.AZURE_COSMOSDB_DATABASE }}" \
+                cosmos-container="${{ secrets.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER }}" \
+                cosmos-usertraffic="${{ secrets.AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER }}" \
+              --env-vars \
+                APP_TENANT_ID=secretref:app-tenant-id \
+                APP_CLIENT_ID=secretref:app-client-id \
+                APP_CLIENT_SECRET=secretref:app-client-secret \
+                AZURE_COSMOSDB_ACCOUNT=secretref:cosmos-account \
+                AZURE_COSMOSDB_DATABASE=secretref:cosmos-db \
+                AZURE_COSMOSDB_CONVERSATIONS_CONTAINER=secretref:cosmos-container \
+                AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER=secretref:cosmos-usertraffic
+          fi
+
+      - name: Deploy monitor job (create-or-update)
+        run: |
+          IMAGE="${{ vars.ACR_NAME }}.azurecr.io/eyesondocs-monitor:${IMAGE_TAG}"
+          if az containerapp job show -n ${{ vars.MONITOR_JOB_NAME }} -g ${{ vars.RESOURCE_GROUP }} >/dev/null 2>&1; then
+            echo "monitor job exists — updating image only"
+            az containerapp job update \
+              --name ${{ vars.MONITOR_JOB_NAME }} \
+              --resource-group ${{ vars.RESOURCE_GROUP }} \
+              --image "$IMAGE"
+          else
+            echo "monitor job missing — full create"
+            az containerapp job create \
+              --name ${{ vars.MONITOR_JOB_NAME }} \
+              --resource-group ${{ vars.RESOURCE_GROUP }} \
+              --environment ${{ vars.ACA_ENVIRONMENT }} \
+              --image "$IMAGE" \
+              --trigger-type Schedule --cron-expression "0 */2 * * *" \
+              --replica-timeout 3600 --replica-retry-limit 1 --parallelism 1 --replica-completion-count 1 \
+              --mi-user-assigned "${{ steps.uami.outputs.uami_id }}" \
+              --registry-server ${{ vars.ACR_NAME }}.azurecr.io \
+              --registry-identity "${{ steps.uami.outputs.uami_id }}" \
+              --cpu 0.5 --memory 1Gi \
+              --secrets \
+                app-tenant-id="${{ secrets.APP_TENANT_ID }}" \
+                app-client-id="${{ secrets.APP_CLIENT_ID }}" \
+                app-client-secret="${{ secrets.APP_CLIENT_SECRET }}" \
+                cosmos-account="${{ secrets.AZURE_COSMOSDB_ACCOUNT }}" \
+                cosmos-db="${{ secrets.AZURE_COSMOSDB_DATABASE }}" \
+                cosmos-container="${{ secrets.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER }}" \
+                aoai-key="${{ secrets.AZURE_OPENAI_KEY }}" \
+                personal-token="${{ secrets.PERSONAL_TOKEN }}" \
+              --env-vars \
+                APP_TENANT_ID=secretref:app-tenant-id \
+                APP_CLIENT_ID=secretref:app-client-id \
+                APP_CLIENT_SECRET=secretref:app-client-secret \
+                AZURE_COSMOSDB_ACCOUNT=secretref:cosmos-account \
+                AZURE_COSMOSDB_DATABASE=secretref:cosmos-db \
+                AZURE_COSMOSDB_CONVERSATIONS_CONTAINER=secretref:cosmos-container \
+                AZURE_OPENAI_KEY=secretref:aoai-key \
+                AZURE_OPENAI_ENDPOINT="${{ secrets.AZURE_OPENAI_ENDPOINT }}" \
+                AZURE_OPENAI_DEPLOYMENT="${{ secrets.AZURE_OPENAI_DEPLOYMENT }}" \
+                PERSONAL_TOKEN=secretref:personal-token \
+                DISABLE_TEAMS_WEBHOOK=1 \
+                RUN_ONCE=1 \
+                TARGET_CONFIG_PATH=/app/target_config.json
+          fi
 
       - name: Smoke test (web)
         run: |
