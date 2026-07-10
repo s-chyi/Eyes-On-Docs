@@ -138,7 +138,7 @@ jobs:
               --registry-server ${{ vars.ACR_NAME }}.azurecr.io \
               --registry-identity "${{ steps.uami.outputs.uami_id }}" \
               --ingress external --target-port 10086 --transport auto \
-              --min-replicas 0 --max-replicas 2 \
+              --min-replicas ${{ vars.WEB_MIN_REPLICAS || '0' }} --max-replicas 2 \
               --cpu 0.5 --memory 1Gi \
               --secrets \
                 app-tenant-id="${{ secrets.APP_TENANT_ID }}" \
@@ -149,6 +149,7 @@ jobs:
                 cosmos-container="${{ secrets.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER }}" \
                 cosmos-usertraffic="${{ secrets.AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER }}" \
                 nextauth-secret="${{ secrets.NEXTAUTH_SECRET }}" \
+                admin-password="${{ secrets.ADMIN_PASSWORD }}" \
               --env-vars \
                 APP_TENANT_ID=secretref:app-tenant-id \
                 APP_CLIENT_ID=secretref:app-client-id \
@@ -159,6 +160,7 @@ jobs:
                 AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER=secretref:cosmos-usertraffic \
                 NEXTAUTH_SECRET=secretref:nextauth-secret \
                 NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}" \
+                ADMIN_PASSWORD=secretref:admin-password \
                 LOG_TO_STDOUT_ONLY=1
           fi
 
@@ -182,7 +184,7 @@ jobs:
               --registry-server ${{ vars.ACR_NAME }}.azurecr.io \
               --registry-identity "${{ steps.uami.outputs.uami_id }}" \
               --ingress external --target-port 8000 --transport auto \
-              --min-replicas 0 --max-replicas 2 \
+              --min-replicas ${{ vars.MCP_MIN_REPLICAS || '0' }} --max-replicas 2 \
               --cpu 0.5 --memory 1Gi \
               --secrets \
                 app-tenant-id="${{ secrets.APP_TENANT_ID }}" \
@@ -192,6 +194,7 @@ jobs:
                 cosmos-db="${{ secrets.AZURE_COSMOSDB_DATABASE }}" \
                 cosmos-container="${{ secrets.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER }}" \
                 cosmos-usertraffic="${{ secrets.AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER }}" \
+                admin-password="${{ secrets.ADMIN_PASSWORD }}" \
               --env-vars \
                 APP_TENANT_ID=secretref:app-tenant-id \
                 APP_CLIENT_ID=secretref:app-client-id \
@@ -199,7 +202,8 @@ jobs:
                 AZURE_COSMOSDB_ACCOUNT=secretref:cosmos-account \
                 AZURE_COSMOSDB_DATABASE=secretref:cosmos-db \
                 AZURE_COSMOSDB_CONVERSATIONS_CONTAINER=secretref:cosmos-container \
-                AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER=secretref:cosmos-usertraffic
+                AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER=secretref:cosmos-usertraffic \
+                DOCS_USAGE_ADMIN_PASSWORD=secretref:admin-password
           fi
 
       - name: Deploy monitor job (create-or-update)
