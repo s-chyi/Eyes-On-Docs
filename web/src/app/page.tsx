@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Filters from '@/components/Filters';
 import { Pagination } from '@/components/Pagination';
 import UpdateCard from '@/components/UpdateCard';
+import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { DEFAULT_PRODUCT, FALLBACK_PRODUCTS, PRODUCT_LABELS } from '@/lib/products';
 
@@ -257,6 +258,15 @@ export default function Home({ searchParams }: { searchParams: { product?: strin
                 </div>
               </div>
             </div>
+          </div>
+          <div className="flex items-center mx-2">
+            <Link
+              href="/triage"
+              className="px-4 py-2 rounded-full bg-background-secondary text-accent-secondary border border-accent-secondary/40 hover:bg-accent-secondary hover:text-background-primary transition-colors text-sm font-medium"
+              title="Open triage view"
+            >
+              Triage →
+            </Link>
           </div>
           <div className="flex items-center mx-4">
             <button
