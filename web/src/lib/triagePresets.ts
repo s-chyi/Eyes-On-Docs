@@ -94,3 +94,22 @@ export function isoToLocalInput(iso: string): string {
 export function localInputToIso(local: string): string {
   return new Date(local).toISOString();
 }
+
+// For date input: ISO -> "YYYY-MM-DD" in local TZ.
+export function isoToDateInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// "YYYY-MM-DD" (local) -> ISO at 00:00 local time.
+export function dateInputToIsoStart(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0).toISOString();
+}
+
+// "YYYY-MM-DD" (local) -> ISO at 23:59:59 local time (inclusive "until").
+export function dateInputToIsoEnd(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999).toISOString();
+}

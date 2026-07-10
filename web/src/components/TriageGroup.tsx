@@ -20,41 +20,39 @@ interface TriageItem {
 interface TriageGroupProps {
   topic: string;
   items: TriageItem[];
-  isRead: (id: string) => boolean;
-  isStarred: (id: string) => boolean;
-  onToggleRead: (id: string) => void;
-  onToggleStar: (id: string) => void;
+  isSelected: (id: string) => boolean;
+  onToggleSelected: (id: string) => void;
   defaultCollapsed?: boolean;
 }
 
 export default function TriageGroup({
-  topic, items, isRead, isStarred, onToggleRead, onToggleStar, defaultCollapsed,
+  topic, items, isSelected, onToggleSelected, defaultCollapsed,
 }: TriageGroupProps) {
   const [collapsed, setCollapsed] = useState<boolean>(defaultCollapsed ?? items.length === 0);
   const label = PRODUCT_LABELS[topic] ?? topic;
-  const unread = items.filter(i => !isRead(i.id)).length;
-  const starred = items.filter(i => isStarred(i.id)).length;
+  const selected = items.filter(i => isSelected(i.id)).length;
 
   return (
-    <section className="mb-6">
+    <section className="mb-5">
       <button
         onClick={() => setCollapsed(c => !c)}
-        className="w-full flex items-center justify-between py-2 px-3 bg-background-secondary rounded-md hover:bg-background-secondary/80 transition-colors"
+        className="w-full flex items-center justify-between py-2.5 px-4 bg-slate-800/60 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700/50"
       >
         <div className="flex items-center gap-2">
-          {collapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
-          <span className="text-lg font-semibold text-accent-secondary">{label}</span>
-          <span className="text-sm text-text-secondary">({items.length})</span>
+          {collapsed ? <ChevronRight size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+          <span className="text-base font-semibold text-slate-100">{label}</span>
+          <span className="text-sm text-slate-400">({items.length})</span>
         </div>
-        <div className="flex items-center gap-3 text-xs text-text-secondary">
-          <span>{unread} unread</span>
-          {starred > 0 && <span className="text-yellow-400">{starred} ★</span>}
-        </div>
+        {selected > 0 && (
+          <span className="text-xs text-sky-300 bg-sky-500/10 border border-sky-400/30 px-2 py-0.5 rounded-full">
+            已選 {selected}
+          </span>
+        )}
       </button>
       {!collapsed && (
         <div className="mt-3 flex flex-col gap-3">
           {items.length === 0 ? (
-            <div className="text-text-secondary text-sm px-3 py-2">No updates in range.</div>
+            <div className="text-slate-500 text-sm px-4 py-2">此時段內無更新</div>
           ) : (
             items.map(item => (
               <TriageCard
@@ -67,10 +65,8 @@ export default function TriageGroup({
                 gptSummary={item.gptSummary}
                 liveStatus={item.liveStatus}
                 wentLiveAt={item.wentLiveAt}
-                isRead={isRead(item.id)}
-                isStarred={isStarred(item.id)}
-                onToggleRead={() => onToggleRead(item.id)}
-                onToggleStar={() => onToggleStar(item.id)}
+                isSelected={isSelected(item.id)}
+                onToggleSelected={() => onToggleSelected(item.id)}
               />
             ))
           )}

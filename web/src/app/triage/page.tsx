@@ -3,17 +3,16 @@
 import React, { Suspense, useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Copy } from 'lucide-react';
 import { PRESETS, PresetKey, inferSince } from '@/lib/triagePresets';
 import { useTriageState } from '@/lib/useTriageState';
 import { buildOneNoteHtml, buildMarkdown, copyToClipboard, TriageItem } from '@/lib/triageExport';
 import TriageHeader from '@/components/TriageHeader';
 import TriageGroup from '@/components/TriageGroup';
 
-type ExportScope = 'starred' | 'unread' | 'all';
-
 export default function TriagePageWrapper() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background-primary text-text-secondary p-8 text-center">Loading…</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 text-slate-400 p-8 text-center">Loading…</div>}>
       <TriagePage />
     </Suspense>
   );
@@ -25,27 +24,24 @@ function TriagePage() {
 
   const initialPreset = (searchParams.get('preset') as PresetKey) || 'aoai';
   const initialLanguage = (searchParams.get('language') as 'Chinese' | 'English') || 'Chinese';
+  const validPreset: PresetKey = initialPreset in PRESETS ? initialPreset : 'aoai';
 
-  const [preset, setPreset] = useState<PresetKey>(initialPreset in PRESETS ? initialPreset : 'aoai');
+  const [preset, setPreset] = useState<PresetKey>(validPreset);
   const [language, setLanguage] = useState<'Chinese' | 'English'>(initialLanguage);
   const [products, setProducts] = useState<string[]>(() => {
     const fromUrl = searchParams.get('products');
     if (fromUrl) return fromUrl.split(',').map(s => s.trim()).filter(Boolean);
-    return [...PRESETS[initialPreset in PRESETS ? initialPreset : 'aoai'].products];
+    return [...PRESETS[validPreset].products];
   });
-  const [since, setSince] = useState<string>(() => {
-    return searchParams.get('since') || inferSince(initialPreset in PRESETS ? initialPreset : 'aoai');
-  });
+  const [since, setSince] = useState<string>(() => searchParams.get('since') || inferSince(validPreset));
   const [until, setUntil] = useState<string>(() => searchParams.get('until') || new Date().toISOString());
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<TriageItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exportScope, setExportScope] = useState<ExportScope>('starred');
-  const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   const state = useTriageState();
 
-  // Sync URL when preset/products/since/until/language changes.
   useEffect(() => {
     const params = new URLSearchParams();
     params.set('preset', preset);
@@ -57,7 +53,6 @@ function TriagePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset, language, products.join(','), since, until]);
 
-  // When preset changes, reset products + since (unless URL held override on mount).
   const handlePresetChange = (p: PresetKey) => {
     setPreset(p);
     setProducts([...PRESETS[p].products]);
@@ -65,7 +60,6 @@ function TriagePage() {
     setUntil(new Date().toISOString());
   };
 
-  // Fetch
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -86,13 +80,11 @@ function TriagePage() {
         const res = await fetch(`/api/updates?${p.toString()}`);
         if (!res.ok) throw new Error('fetch failed');
         const data = await res.json();
-        if (!cancelled) {
-          setItems(data.updates || []);
-        }
+        if (!cancelled) setItems(data.updates || []);
       } catch (e) {
         console.error(e);
         if (!cancelled) {
-          toast.error('Failed to load updates');
+          toast.error('載入失敗');
           setItems([]);
         }
       } finally {
@@ -103,7 +95,6 @@ function TriagePage() {
     return () => { cancelled = true; };
   }, [products.join(','), language, since, until]);
 
-  // Client-side search + group by topic in preset order.
   const filteredByProduct = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = q
@@ -122,48 +113,40 @@ function TriagePage() {
   }, [items, search, products.join(',')]);
 
   const totalCount = items.length;
-  const unreadCount = items.filter(i => !state.isRead(i.id)).length;
-  const starredCount = items.filter(i => state.isStarred(i.id)).length;
+  const selectedCount = items.filter(i => state.isSelected(i.id)).length;
 
-  const handleExport = useCallback(async () => {
-    let subset: TriageItem[];
-    if (exportScope === 'starred') subset = items.filter(i => state.isStarred(i.id));
-    else if (exportScope === 'unread') subset = items.filter(i => !state.isRead(i.id));
-    else subset = items;
-
+  const handleCopy = useCallback(async () => {
+    const subset = items.filter(i => state.isSelected(i.id));
     if (subset.length === 0) {
-      toast.warning('Nothing to export in current scope');
+      toast.warning('請先勾選要複製的項目');
       return;
     }
-    // Preserve preset product order in export.
     const orderIndex: Record<string, number> = {};
     products.forEach((p, i) => { orderIndex[p] = i; });
-    subset = [...subset].sort((a, b) => {
+    const sorted = [...subset].sort((a, b) => {
       const ai = orderIndex[a.topic] ?? 999;
       const bi = orderIndex[b.topic] ?? 999;
       if (ai !== bi) return ai - bi;
       return (b.timestamp || '').localeCompare(a.timestamp || '');
     });
 
-    const html = buildOneNoteHtml(subset, 'product');
-    const md = buildMarkdown(subset, 'product');
+    setCopying(true);
     try {
+      const html = buildOneNoteHtml(sorted, 'product');
+      const md = buildMarkdown(sorted, 'product');
       await copyToClipboard(html, md);
-      toast.success(`Copied ${subset.length} items to clipboard — paste into OneNote`);
+      toast.success(`已複製 ${sorted.length} 則到剪貼簿`);
     } catch (e) {
       console.error(e);
-      toast.error('Clipboard write failed — see console for markdown fallback');
-      console.log('---- Triage Markdown Fallback ----\n' + md);
+      toast.error('複製失敗，Markdown 已印在 console');
+      console.log('---- Triage Markdown Fallback ----\n' + buildMarkdown(sorted, 'product'));
+    } finally {
+      setCopying(false);
     }
-  }, [items, exportScope, products, state]);
-
-  const useLastTriagePointer = () => {
-    const last = state.lastTriageAt[preset];
-    if (last) setSince(last);
-  };
+  }, [items, products, state]);
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-background-primary text-text-primary pb-24">
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 pb-24">
       <div className="max-w-5xl mx-auto">
         <TriageHeader
           preset={preset}
@@ -173,23 +156,20 @@ function TriagePage() {
           language={language}
           search={search}
           totalCount={totalCount}
-          unreadCount={unreadCount}
-          starredCount={starredCount}
-          lastTriageAt={state.lastTriageAt[preset]}
+          selectedCount={selectedCount}
           onPresetChange={handlePresetChange}
           onSinceChange={setSince}
           onUntilChange={setUntil}
           onProductsChange={setProducts}
           onLanguageChange={setLanguage}
           onSearchChange={setSearch}
-          onUseLastTriage={useLastTriagePointer}
         />
 
         {loading ? (
-          <div className="text-center text-text-secondary py-12">Loading…</div>
+          <div className="text-center text-slate-400 py-12">Loading…</div>
         ) : totalCount === 0 ? (
-          <div className="text-center text-text-secondary py-12">
-            No updates in this window. Try widening the date range or adding products.
+          <div className="text-center text-slate-500 py-12 border border-dashed border-slate-700 rounded-lg">
+            此時段內無更新。試試調整日期或加入更多產品。
           </div>
         ) : (
           <div>
@@ -200,10 +180,8 @@ function TriagePage() {
                   key={topic}
                   topic={topic}
                   items={list}
-                  isRead={state.isRead}
-                  isStarred={state.isStarred}
-                  onToggleRead={state.toggleRead}
-                  onToggleStar={state.toggleStar}
+                  isSelected={state.isSelected}
+                  onToggleSelected={state.toggleSelected}
                   defaultCollapsed={list.length === 0}
                 />
               );
@@ -212,48 +190,35 @@ function TriagePage() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-accent-secondary/30 p-3 flex justify-between items-center z-20">
-        <div className="max-w-5xl w-full mx-auto flex justify-between items-center px-4">
-          <div className="relative flex items-center gap-2">
-            <button
-              onClick={handleExport}
-              className="px-4 py-2 rounded-md bg-accent-secondary text-background-primary font-medium hover:opacity-90 transition-opacity"
-            >
-              Export {exportScope === 'starred' ? `${starredCount} starred` :
-                exportScope === 'unread' ? `${unreadCount} unread` :
-                `all ${totalCount}`}
-            </button>
-            <button
-              onClick={() => setScopeMenuOpen(o => !o)}
-              className="px-2 py-2 rounded-md bg-background-primary text-text-secondary hover:text-accent-secondary text-xs"
-            >
-              ▾
-            </button>
-            {scopeMenuOpen && (
-              <div className="absolute bottom-full mb-2 left-0 bg-background-primary border border-accent-secondary/30 rounded-md shadow-lg overflow-hidden z-30">
-                {(['starred', 'unread', 'all'] as ExportScope[]).map(s => (
-                  <button
-                    key={s}
-                    onClick={() => { setExportScope(s); setScopeMenuOpen(false); }}
-                    className={`block w-full text-left px-3 py-2 text-xs hover:bg-accent-secondary hover:text-background-primary ${
-                      exportScope === s ? 'text-accent-secondary' : 'text-text-primary'
-                    }`}
-                  >
-                    Export {s}
-                  </button>
-                ))}
-              </div>
-            )}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-slate-700/60 py-3 z-20">
+        <div className="max-w-5xl mx-auto flex justify-between items-center px-4">
+          <div className="text-sm text-slate-400">
+            {selectedCount > 0
+              ? <>已選 <span className="text-sky-300 font-medium">{selectedCount}</span> 則,按複製後可貼進 OneNote</>
+              : <span className="text-slate-500">勾選左側方塊來選取要複製的項目</span>}
           </div>
-          <button
-            onClick={() => {
-              state.markTriageDone(preset);
-              toast.success('Marked triage done for ' + PRESETS[preset].label);
-            }}
-            className="px-4 py-2 rounded-md bg-background-primary text-text-secondary hover:text-accent-secondary border border-accent-secondary/40 text-sm"
-          >
-            Mark triage done
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedCount > 0 && (
+              <button
+                onClick={state.clearSelected}
+                className="px-3 py-2 rounded-md text-slate-400 hover:text-slate-200 text-sm transition-colors"
+              >
+                清除選取
+              </button>
+            )}
+            <button
+              onClick={handleCopy}
+              disabled={selectedCount === 0 || copying}
+              className={`px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center gap-2 ${
+                selectedCount === 0
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/30'
+              }`}
+            >
+              <Copy size={15} />
+              {copying ? '複製中…' : `複製 ${selectedCount || ''}`.trim()}
+            </button>
+          </div>
         </div>
       </div>
     </main>

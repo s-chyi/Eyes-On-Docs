@@ -262,10 +262,23 @@ export default function Home({ searchParams }: { searchParams: { product?: strin
           <div className="flex items-center mx-2">
             <Link
               href="/triage"
-              className="px-4 py-2 rounded-full bg-background-secondary text-accent-secondary border border-accent-secondary/40 hover:bg-accent-secondary hover:text-background-primary transition-colors text-sm font-medium"
-              title="Open triage view"
+              className="
+                group
+                relative
+                px-4 py-2
+                bg-gradient-to-r from-sky-500 to-indigo-500
+                text-white
+                rounded-full
+                hover:from-sky-400 hover:to-indigo-400
+                transition-all
+                duration-300
+                text-sm
+                font-medium
+                shadow-md shadow-sky-500/20
+              "
+              title="Triage meeting view"
             >
-              Triage →
+              🎯 Triage
             </Link>
           </div>
           <div className="flex items-center mx-4">

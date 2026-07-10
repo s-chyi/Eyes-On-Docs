@@ -1,13 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
-import type { PresetKey } from './triagePresets';
 
-const KEY_READ = 'eod:triage:readIds';
-const KEY_STARRED = 'eod:triage:starredIds';
-const KEY_LAST = 'eod:triage:lastTriageAt';
-
-type LastTriageMap = Partial<Record<PresetKey, string>>;
+const KEY_SELECTED = 'eod:triage:selectedIds';
 
 function readSet(key: string): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -26,91 +21,40 @@ function writeSet(key: string, s: Set<string>): void {
   try {
     window.localStorage.setItem(key, JSON.stringify([...s]));
   } catch {
-    /* ignore quota / privacy mode */
-  }
-}
-
-function readLast(): LastTriageMap {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(KEY_LAST);
-    if (!raw) return {};
-    return JSON.parse(raw) as LastTriageMap;
-  } catch {
-    return {};
-  }
-}
-
-function writeLast(m: LastTriageMap): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(KEY_LAST, JSON.stringify(m));
-  } catch {
     /* ignore */
   }
 }
 
 export function useTriageState() {
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
-  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
-  const [lastTriageAt, setLastTriageAt] = useState<LastTriageMap>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setReadIds(readSet(KEY_READ));
-    setStarredIds(readSet(KEY_STARRED));
-    setLastTriageAt(readLast());
+    setSelectedIds(readSet(KEY_SELECTED));
     setHydrated(true);
   }, []);
 
-  const isRead = useCallback((id: string) => readIds.has(id), [readIds]);
-  const isStarred = useCallback((id: string) => starredIds.has(id), [starredIds]);
+  const isSelected = useCallback((id: string) => selectedIds.has(id), [selectedIds]);
 
-  const toggleRead = useCallback((id: string) => {
-    setReadIds(prev => {
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
-      writeSet(KEY_READ, next);
+      writeSet(KEY_SELECTED, next);
       return next;
     });
   }, []);
 
-  const toggleStar = useCallback((id: string) => {
-    setStarredIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      writeSet(KEY_STARRED, next);
-      return next;
-    });
-  }, []);
-
-  const markAllRead = useCallback((ids: string[]) => {
-    setReadIds(prev => {
-      const next = new Set(prev);
-      ids.forEach(i => next.add(i));
-      writeSet(KEY_READ, next);
-      return next;
-    });
-  }, []);
-
-  const markTriageDone = useCallback((preset: PresetKey) => {
-    setLastTriageAt(prev => {
-      const next = { ...prev, [preset]: new Date().toISOString() };
-      writeLast(next);
-      return next;
-    });
+  const clearSelected = useCallback(() => {
+    setSelectedIds(new Set());
+    writeSet(KEY_SELECTED, new Set());
   }, []);
 
   return {
     hydrated,
-    readIds,
-    starredIds,
-    isRead,
-    isStarred,
-    toggleRead,
-    toggleStar,
-    markAllRead,
-    markTriageDone,
-    lastTriageAt,
+    selectedIds,
+    isSelected,
+    toggleSelected,
+    clearSelected,
   };
 }
