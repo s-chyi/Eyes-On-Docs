@@ -253,3 +253,70 @@ body {
   box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.06);
 }
 
+/* ============================================================
+   Semantic overrides for hardcoded accent classes in light theme.
+   Dark uses saturated cyan/magenta on dark bg (good contrast);
+   in light those same classes render as black-on-black or
+   invisible white-on-white. Remap here without touching markup.
+   ============================================================ */
+
+/* Default: any pill/tag styled bg-accent-secondary in light → soft gray + dark text */
+[data-theme="light"] .bg-accent-secondary {
+  background-color: #f5f5f5 !important;
+  color: #0d0d0d !important;
+  border: 1px solid #e5e5e5;
+}
+
+/* But buttons that use bg-accent-secondary as their primary action (Ni Hao, Update-type
+   slider) look weak as light-gray on white — bump them to solid black. */
+[data-theme="light"] button.bg-accent-secondary,
+[data-theme="light"] .bg-accent-secondary.absolute {
+  background-color: #0d0d0d !important;
+  color: #ffffff !important;
+  border: none;
+}
+[data-theme="light"] button.bg-accent-secondary:hover,
+[data-theme="light"] button.hover\:bg-accent-secondary\/90:hover {
+  background-color: #262626 !important;
+}
+
+/* text-background-primary was white (originally reverse-out on cyberpunk).
+   In light this must remain white ONLY when it sits on the black button;
+   otherwise it becomes invisible on the light gray card. */
+[data-theme="light"] button .text-background-primary,
+[data-theme="light"] .text-background-primary {
+  color: #ffffff !important;
+}
+/* But inside the Weekly-Summary toggle inactive half, class text-background-primary was
+   added conditionally — when it's on the ACTIVE (black slider) half it's white ✓; the
+   inactive half uses text-text-secondary → override to gray. Already handled by tokens. */
+
+/* Cyberpunk primary color → mono neutral in light */
+[data-theme="light"] .bg-accent-primary {
+  background-color: #0d0d0d !important;
+  color: #ffffff !important;
+}
+
+/* Accent-secondary text → black */
+[data-theme="light"] .text-accent-secondary,
+[data-theme="light"] .hover\:text-accent-secondary:hover {
+  color: #0d0d0d !important;
+}
+
+/* bg-background-secondary (dropdowns, filter surface) → very light gray */
+[data-theme="light"] .bg-background-secondary {
+  background-color: #f5f5f5 !important;
+}
+
+/* Update-type toggle container itself is bg-background-secondary; slider inside is
+   .absolute.bg-accent-secondary — the .absolute selector above bumps it to black. */
+
+/* Author email links */
+[data-theme="light"] a[href^="mailto"] {
+  color: #2563eb !important;
+}
+
+/* text-black used in UpdateCard tag span — in light-theme override it's on #f5f5f5, fine. */
+
+
+
