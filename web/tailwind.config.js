@@ -9,19 +9,19 @@ module.exports = {
     extend: {
       colors: {
         background: {
-          primary: '#0A0A1A',
-          secondary: '#121228',
+          primary: 'var(--background-primary)',
+          secondary: 'var(--background-secondary)',
         },
         text: {
-          primary: '#00FFD1',
-          secondary: '#7E7EFF',
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
         },
         accent: {
-          primary: '#FF00FF',
-          secondary: '#00FFFF',
+          primary: 'var(--accent-primary)',
+          secondary: 'var(--accent-secondary)',
         },
         border: {
-          color: '#3A3A5A',
+          color: 'var(--border-color)',
         },
       },
       boxShadow: {

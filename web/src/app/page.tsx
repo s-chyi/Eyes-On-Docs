@@ -6,8 +6,10 @@ import Filters from '@/components/Filters';
 import { Pagination } from '@/components/Pagination';
 import UpdateCard from '@/components/UpdateCard';
 import Link from 'next/link';
+import { Target } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { DEFAULT_PRODUCT, FALLBACK_PRODUCTS, PRODUCT_LABELS } from '@/lib/products';
+import ThemeToggle from '@/components/ThemeToggle';
 
 async function getProducts() {
   try {
@@ -259,26 +261,26 @@ export default function Home({ searchParams }: { searchParams: { product?: strin
               </div>
             </div>
           </div>
-          <div className="flex items-center mx-2">
+          <div className="flex items-center mx-2 gap-2">
+            <ThemeToggle />
             <Link
               href="/triage"
               className="
-                group
-                relative
+                inline-flex items-center gap-1.5
                 px-4 py-2
-                bg-gradient-to-r from-sky-500 to-indigo-500
-                text-white
+                bg-background-secondary text-text-primary
+                border border-border-color
                 rounded-full
-                hover:from-sky-400 hover:to-indigo-400
-                transition-all
-                duration-300
+                hover:opacity-80
+                transition-opacity
                 text-sm
                 font-medium
-                shadow-md shadow-sky-500/20
+                whitespace-nowrap
               "
               title="Triage meeting view"
             >
-              🎯 Triage
+              <Target size={15} />
+              Triage
             </Link>
           </div>
           <div className="flex items-center mx-4">

@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* === Dark theme (Joey cyberpunk, default) === */
+:root,
+[data-theme="dark"] {
   --background-primary: #0A0A1A;
   --background-secondary: #121228;
   --text-primary: #00FFD1;
@@ -10,28 +12,114 @@
   --accent-primary: #FF00FF;
   --accent-secondary: #00FFFF;
   --border-color: #3A3A5A;
+
+  /* Card surface tokens (used by .cyberpunk-card) */
+  --card-bg: #000000;
+  --card-border: var(--border-color);
+  --card-hover-border: var(--accent-primary);
+  --card-title: #facc15; /* yellow-400 */
+  --link-color: var(--accent-secondary);
+  --link-hover-color: var(--accent-primary);
+}
+
+/* === Light theme (OpenAI-inspired: minimal, monochrome, generous whitespace) === */
+[data-theme="light"] {
+  --background-primary: #ffffff;
+  --background-secondary: #f5f5f5;
+  --text-primary: #0d0d0d;
+  --text-secondary: #6b6b6b;
+  --accent-primary: #0d0d0d;    /* mono black, no chroma */
+  --accent-secondary: #171717;  /* near-black */
+  --border-color: #e5e5e5;
+
+  --card-bg: #ffffff;
+  --card-border: #e5e5e5;
+  --card-hover-border: #0d0d0d;
+  --card-title: #0d0d0d;
+  --link-color: #2563eb;        /* only true chromatic accent in light: links */
+  --link-hover-color: #1d4ed8;
+}
+
+html, body {
+  background: var(--background-primary);
+  color: var(--text-primary);
 }
 
 body {
-  @apply bg-background-primary text-text-primary;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Cyberpunk card in dark theme; light theme reads the same class but with white tokens */
 .cyberpunk-card {
-  @apply bg-black border border-border-color rounded-lg p-4 shadow-lg hover:shadow-2xl hover:border-accent-primary transition-all duration-300 w-full flex flex-col space-y-3;
-  background: black;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+[data-theme="dark"] .cyberpunk-card {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px);
 }
 
+[data-theme="dark"] .cyberpunk-card:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+[data-theme="light"] .cyberpunk-card {
+  box-shadow: none;
+}
+
+[data-theme="light"] .cyberpunk-card:hover {
+  border-color: #d4d4d4;
+}
+
+/* UpdateCard title uses text-yellow-400 hardcoded; in light theme force it monochrome */
+[data-theme="light"] .text-yellow-400 {
+  color: var(--card-title) !important;
+}
+
+[data-theme="light"] .prose-invert {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .prose-invert :where(p,li,ul,ol,code,strong) {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .prose li::marker {
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] .prose code {
+  background: #f5f5f5 !important;
+  color: #0d0d0d !important;
+}
+
 .cyberpunk-input {
-  @apply bg-background-secondary border border-border-color text-text-primary rounded-md focus:ring-accent-primary focus:border-accent-primary;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 0.375rem;
   transition: all 0.3s ease;
 }
 
 .cyberpunk-button {
-  @apply bg-accent-primary text-background-primary hover:bg-accent-secondary transition-all duration-300 rounded-md px-4 py-2;
+  background: var(--accent-primary);
+  color: var(--background-primary);
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
 }
 
+.cyberpunk-button:hover {
+  background: var(--accent-secondary);
+}
+
+/* Text-glow animation only meaningful in dark theme */
 @keyframes text-glow {
   0%, 100% {
     text-shadow: 0 0 5px rgba(0, 255, 209, 0.5), 0 0 10px rgba(255, 0, 255, 0.3);
@@ -44,3 +132,124 @@ body {
 .animate-text-glow {
   animation: text-glow 2s infinite;
 }
+
+[data-theme="light"] .animate-text-glow {
+  animation: none;
+  text-shadow: none;
+}
+
+/* The home-page title gradient looks harsh in light — soften to muted greys */
+[data-theme="light"] .bg-gradient-to-r.from-purple-400.to-cyan-400 {
+  background-image: linear-gradient(to right, #0d0d0d, #404040) !important;
+}
+
+/* The home-page title pulses in dark; in light kill the animation for calm */
+[data-theme="light"] .animate-pulse {
+  animation: none;
+}
+
+/* ============================================================
+   /triage page overrides for light theme
+   Triage components hard-code slate/sky Tailwind utilities to
+   keep the dark experience soft. In light theme, remap them to
+   an OpenAI-style monochrome palette using attribute overrides.
+   ============================================================ */
+
+[data-theme="light"] main.bg-slate-950 {
+  background: #ffffff !important;
+  color: #0d0d0d !important;
+}
+
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200 {
+  color: #0d0d0d !important;
+}
+[data-theme="light"] .text-slate-300,
+[data-theme="light"] .text-slate-400 {
+  color: #6b6b6b !important;
+}
+[data-theme="light"] .text-slate-500,
+[data-theme="light"] .text-slate-600 {
+  color: #9ca3af !important;
+}
+
+[data-theme="light"] .bg-slate-800,
+[data-theme="light"] .bg-slate-800\/60,
+[data-theme="light"] .bg-slate-800\/40,
+[data-theme="light"] .bg-slate-900\/60,
+[data-theme="light"] .bg-slate-900\/95 {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .hover\:bg-slate-800:hover,
+[data-theme="light"] .hover\:bg-slate-700:hover {
+  background-color: #f5f5f5 !important;
+}
+
+[data-theme="light"] .border-slate-700,
+[data-theme="light"] .border-slate-700\/50,
+[data-theme="light"] .border-slate-700\/60,
+[data-theme="light"] .border-slate-700\/40 {
+  border-color: #e5e5e5 !important;
+}
+
+[data-theme="light"] .border-slate-600 {
+  border-color: #d4d4d4 !important;
+}
+
+/* Selection accent: sky → mono black */
+[data-theme="light"] .bg-sky-500,
+[data-theme="light"] .bg-sky-500\/90 {
+  background-color: #0d0d0d !important;
+}
+[data-theme="light"] .hover\:bg-sky-400:hover {
+  background-color: #262626 !important;
+}
+[data-theme="light"] .border-sky-500,
+[data-theme="light"] .focus\:border-sky-500:focus {
+  border-color: #0d0d0d !important;
+}
+[data-theme="light"] .text-sky-300,
+[data-theme="light"] .text-sky-200 {
+  color: #0d0d0d !important;
+}
+[data-theme="light"] .hover\:text-sky-300:hover {
+  color: #0d0d0d !important;
+}
+[data-theme="light"] .ring-sky-400\/60,
+[data-theme="light"] .ring-sky-400 {
+  --tw-ring-color: rgba(13, 13, 13, 0.6) !important;
+}
+[data-theme="light"] .ring-offset-slate-900 {
+  --tw-ring-offset-color: #ffffff !important;
+}
+[data-theme="light"] .bg-sky-500\/10,
+[data-theme="light"] .bg-sky-500\/20 {
+  background-color: rgba(13, 13, 13, 0.05) !important;
+}
+[data-theme="light"] .border-sky-400\/30,
+[data-theme="light"] .border-sky-500\/50 {
+  border-color: rgba(13, 13, 13, 0.15) !important;
+}
+[data-theme="light"] .shadow-sky-500\/30,
+[data-theme="light"] .shadow-sky-500\/50 {
+  --tw-shadow-color: rgba(0, 0, 0, 0.15) !important;
+  --tw-shadow: var(--tw-shadow-colored) !important;
+}
+
+/* Placeholder */
+[data-theme="light"] .placeholder-slate-500::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Date input color scheme */
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="datetime-local"] {
+  color-scheme: light !important;
+}
+
+/* Fixed bottom bar in light needs subtle top shadow to separate from content */
+[data-theme="light"] .fixed.bottom-0 {
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.06);
+}
+
