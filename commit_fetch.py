@@ -231,15 +231,31 @@ class CommitFetcher:
                    - latest_crawl_time: 最新的commit时间，用于下次筛选的起始点
         """
         # 筛选出开始时间之后的commit
-        selected_commits = {key: url for key, url in commits_dic_time_url.items() if key > start_time}  
-  
+        selected_commits = {key: url for key, url in commits_dic_time_url.items() if key > start_time}
+
         # 按时间升序排序，确保按时间顺序处理commit
-        selected_commits = dict(sorted(selected_commits.items(), key=lambda x: x[0]))  
-  
+        selected_commits = dict(sorted(selected_commits.items(), key=lambda x: x[0]))
+
         # 记录筛选后的commit数量
-        selected_commits_length = len(selected_commits)  
-        logger.warning(f"++++++++++++++++++++++++ {selected_commits_length} selected commits: {selected_commits}")  
-  
+        selected_commits_length = len(selected_commits)
+        logger.warning(f"++++++++++++++++++++++++ {selected_commits_length} selected commits: {selected_commits}")
+
+        # Sanity cap：一次 >10 筆通常代表 monitor 曾中斷（PAT 過期、job 停跑等）恢復後
+        # 大量 catch-up。保留最新 10 筆處理、log 丟掉的 sha 讓運維知道 gap。
+        # 避免一口氣推 30+ 則 Teams、也避免長時間跑一輪。
+        SELECT_CAP = 10
+        if selected_commits_length > SELECT_CAP:
+            all_times_sorted_desc = sorted(selected_commits.keys(), reverse=True)
+            kept_times = set(all_times_sorted_desc[:SELECT_CAP])
+            dropped = {t: u for t, u in selected_commits.items() if t not in kept_times}
+            selected_commits = {t: u for t, u in selected_commits.items() if t in kept_times}
+            selected_commits = dict(sorted(selected_commits.items(), key=lambda x: x[0]))
+            logger.warning(
+                f"!! SELECT_CAP triggered: kept newest {SELECT_CAP}/{selected_commits_length}, "
+                f"dropped {len(dropped)} older commits (NOT processed): {list(dropped.values())}"
+            )
+            selected_commits_length = len(selected_commits)
+
         # 获取最新的commit时间，用作下次筛选的起始时间
         if selected_commits_length > 0:  
             latest_crawl_time = str(max(selected_commits.keys()))  

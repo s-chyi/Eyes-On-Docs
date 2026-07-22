@@ -142,15 +142,11 @@ class CosmosDBHandler:
             return lastest_commit_time_in_cosmosdb  
         # 情况4：数据库和本地文件都有记录
         elif lastest_commit_time_in_cosmosdb != None and time_in_last_crawl_time_txt != None:
-            # 比较两个时间，使用较新的作为起始时间
-            if lastest_commit_time_in_cosmosdb > time_in_last_crawl_time_txt:
-                logger.warning(f"lastest_commit_time_in_cosmosdb > time_in_last_crawl_time_txt! Use lastest_commit_time_in_cosmosdb as start time: {lastest_commit_time_in_cosmosdb}")
-                return lastest_commit_time_in_cosmosdb
-            else:
-                # 如果本地文件时间更新，可能会跳过一些commit
-                logger.warning(f"lastest_commit_time_in_cosmosdb <= time_in_last_crawl_time_txt! Use time_in_last_crawl_time_txt as start time: {time_in_last_crawl_time_txt}. ")
-                logger.warning("It may skip some commits.")
-                return time_in_last_crawl_time_txt
+            # 一律用 Cosmos：txt 在 ACA container ephemeral fs、每次重啟變當下時間，
+            # 若採「取較新」邏輯會讓 Cosmos checkpoint 永遠被今天覆蓋、PAT 過期期間的
+            # commit 一旦補不回就永久跳過。Cosmos 是唯一 durable state。
+            logger.warning(f"Use lastest_commit_time_in_cosmosdb as start time (ignoring ephemeral txt={time_in_last_crawl_time_txt}): {lastest_commit_time_in_cosmosdb}")
+            return lastest_commit_time_in_cosmosdb
         
     def write_time(self, update_time):
         """
