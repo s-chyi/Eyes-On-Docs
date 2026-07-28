@@ -74,5 +74,5 @@ export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
 
-// 明確宣告走 Node.js runtime（Cosmos SDK + ClientSecretCredential 需要，Edge runtime 跑不起來）
+// 明確宣告走 Node.js runtime（Cosmos SDK + DefaultAzureCredential 需要，Edge runtime 跑不起來）
 export const runtime = 'nodejs';
