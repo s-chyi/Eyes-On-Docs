@@ -2,7 +2,7 @@
 import os  # 系统环境变量操作
 import datetime  # 时间处理库
 import time  # 时间戳转换库
-from azure.identity import ClientSecretCredential  # Azure身份认证库
+from azure.identity import DefaultAzureCredential  # Azure身份认证库(UAMI on ACA, az cli locally)
 from cosmosdbservice import CosmosConversationClient  # CosmosDB服务客户端
 from logs import logger  # 日志记录器
 from dotenv import load_dotenv  # 环境变量加载器
@@ -35,11 +35,8 @@ class CosmosDBHandler:
         self.account = os.getenv("AZURE_COSMOSDB_ACCOUNT")  # CosmosDB账户名
         self.container = os.getenv("AZURE_COSMOSDB_CONVERSATIONS_CONTAINER")  # 容器名称
         self.account_key = os.getenv("AZURE_COSMOSDB_ACCOUNT_KEY")  # 账户密钥（备用）
-        
-        # Azure AD应用认证信息
-        self.app_tenant_id = os.getenv("APP_TENANT_ID")  # 租户ID
-        self.app_client_id = os.getenv("APP_CLIENT_ID")  # 客户端ID
-        self.app_client_secret = os.getenv("APP_CLIENT_SECRET")  # 客户端密钥
+        # ACA runtime 走 UAMI, 靠 AZURE_CLIENT_ID env 让 DefaultAzureCredential 找到对应身份。
+        # 本机开发走 az login (upn 需要 Cosmos Data Contributor role)。
 
     def initialize_cosmos_client(self):  
         """
@@ -61,12 +58,10 @@ class CosmosDBHandler:
             # else:
             #     credential = self.account_key  # 使用账户密钥
 
-            # 使用Azure AD服务主体认证（推荐方式）
-            credential = ClientSecretCredential(
-                tenant_id=self.app_tenant_id,
-                client_id=self.app_client_id,
-                client_secret=self.app_client_secret
-            )
+            # 使用 DefaultAzureCredential:
+            #   - ACA runtime: 吃 AZURE_CLIENT_ID env → 走 UAMI (id-eyesondocs-nonprod)
+            #   - 本机开发: 走 az cli 登入 (你 upn 需有 Cosmos Data Contributor role)
+            credential = DefaultAzureCredential()
 
             # 创建CosmosDB客户端实例
             client = CosmosConversationClient(  

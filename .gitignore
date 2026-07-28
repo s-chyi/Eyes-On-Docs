@@ -1,6 +1,8 @@
 # .venv
 # frontend/node_modules
 .env
+.env-nonprod
+.env-*
 logs
 test.json
 last_crawl_time.txt

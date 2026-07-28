@@ -1,5 +1,5 @@
 import { CosmosClient } from '@azure/cosmos';
-import { ClientSecretCredential } from '@azure/identity';
+import { DefaultAzureCredential } from '@azure/identity';
 
 // Lazy singleton — first call after runtime env is available initializes the client.
 // Never touched during `next build` "Collecting page data" because callers only invoke it
@@ -8,9 +8,6 @@ import { ClientSecretCredential } from '@azure/identity';
 let cachedClient: CosmosClient | null = null;
 
 const REQUIRED_ENV_VARS = [
-  'APP_TENANT_ID',
-  'APP_CLIENT_ID',
-  'APP_CLIENT_SECRET',
   'AZURE_COSMOSDB_ACCOUNT',
   'AZURE_COSMOSDB_DATABASE',
 ];
@@ -23,11 +20,9 @@ export function getCosmosClient(): CosmosClient {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
-  const credential = new ClientSecretCredential(
-    process.env.APP_TENANT_ID!,
-    process.env.APP_CLIENT_ID!,
-    process.env.APP_CLIENT_SECRET!,
-  );
+  // ACA runtime: reads AZURE_CLIENT_ID env → UAMI (id-eyesondocs-nonprod).
+  // Local dev: az login (upn needs Cosmos Data Contributor role on the account).
+  const credential = new DefaultAzureCredential();
 
   cachedClient = new CosmosClient({
     endpoint: `https://${process.env.AZURE_COSMOSDB_ACCOUNT}.documents.azure.com:443/`,
