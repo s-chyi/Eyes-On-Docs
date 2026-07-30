@@ -168,15 +168,31 @@ For the summary:
 - If the commit involves multiple files, summarize each file separately
 - Focus on: new features/services, important configuration changes, deprecated/removed content, significant documentation structure changes
 - Use professional but accessible language, avoid overly technical jargon
-- Include file paths in the format: "path/to/file.md"
-- The format of Summary part:
-<path of 1st file>\n
-<summary of 1st file> 
-<path of 2nd file>\n
-<summary of 2nd file>
-For example:
-For original path "articles/abc/def/ghi.md", the output should be:
-articles/abc/def/ghi.md \n\n(newline twice) This is a summary of the 1st file. \n\n
+
+CRITICAL FORMAT RULE — every file block MUST follow this exact shape so the
+reader can tell which link belongs to which summary:
+  <URL of file N on its own line>
+  <one blank line>
+  <summary paragraph(s) describing THAT file — do NOT mention or link to any
+   other file inside this summary>
+  <one blank line>
+  <URL of file N+1 on its own line>
+  <one blank line>
+  <summary paragraph(s) describing THAT file>
+  ...
+Rules:
+- The link ABOVE a summary paragraph is the ONE that paragraph describes.
+- Do NOT put other file URLs inside a summary paragraph. If you need to
+  reference another changed file, describe it in that file's own block
+  instead.
+- Do NOT list all URLs together at the top or bottom.
+- Each file gets EXACTLY one URL line and one summary block, in the order
+  they appear in the diff.
+- URL construction: if the file path starts with "articles/", build the URL
+  as `https://learn.microsoft.com/en-us/azure/<path with articles/ stripped
+  and .md removed>`. For files under `/includes/`, prefer the parent
+  article's public URL if the diff makes it obvious; otherwise use the raw
+  GitHub source URL for that include file.
 
 For the title:
 - Format: "[Tag] Brief descriptive title"
