@@ -1,5 +1,5 @@
 import { CosmosClient } from '@azure/cosmos';
-import { DefaultAzureCredential } from '@azure/identity';
+import { ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential, TokenCredential } from '@azure/identity';
 
 // Lazy singleton — first call after runtime env is available initializes the client.
 // Never touched during `next build` "Collecting page data" because callers only invoke it
@@ -20,9 +20,17 @@ export function getCosmosClient(): CosmosClient {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
-  // ACA runtime: reads AZURE_CLIENT_ID env → UAMI (id-eyesondocs-nonprod).
-  // Local dev: az login (upn needs Cosmos Data Contributor role on the account).
-  const credential = new DefaultAzureCredential();
+  // Explicit chain instead of DefaultAzureCredential to avoid its browser-detection path
+  // (which mis-fires under Next.js SSR bundling and throws
+  // "DefaultAzureCredential is not supported in the browser").
+  //   ACA runtime → ManagedIdentityCredential(AZURE_CLIENT_ID = UAMI clientId)
+  //   local dev   → AzureCliCredential (upn needs Cosmos Data Contributor role)
+  const chain: TokenCredential[] = [];
+  if (process.env.AZURE_CLIENT_ID) {
+    chain.push(new ManagedIdentityCredential(process.env.AZURE_CLIENT_ID));
+  }
+  chain.push(new AzureCliCredential());
+  const credential = new ChainedTokenCredential(...chain);
 
   cachedClient = new CosmosClient({
     endpoint: `https://${process.env.AZURE_COSMOSDB_ACCOUNT}.documents.azure.com:443/`,
