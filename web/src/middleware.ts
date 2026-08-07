@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { getCosmosClient } from '@/lib/cosmos';
 
 export async function middleware(request: NextRequest) {
-  const client = getCosmosClient();
   // 获取用户会话信息
   const token = await getToken({ req: request as any });
   const isAuthPage = request.nextUrl.pathname.startsWith('/auth');
@@ -25,7 +23,6 @@ export async function middleware(request: NextRequest) {
     }
   };
 
-  // console.log(visitInfo);
   const response = NextResponse.next();
 
   // 设置全局的缓存控制头
@@ -33,30 +30,16 @@ export async function middleware(request: NextRequest) {
   response.headers.set('Pragma', 'no-cache');
   response.headers.set('Expires', '0');
 
-  // 将访问信息写入Cosmos DB
-  try {
-    await client
-      .database(process.env.AZURE_COSMOSDB_DATABASE!)
-      .container(process.env.AZURE_COSMOSDB_USER_TRAFFIC_CONTAINER!)
-      .items.create(visitInfo);
-  } catch (error) {
-    console.error('Failed to log visit info to Cosmos DB:', error);
-    // 发送错误信息到webhook
-    if (process.env.LOG_ERROR_WEBHOOK_URL) {
-      console.log('Sending error to webhook:');
-      try {
-        await fetch(process.env.LOG_ERROR_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            Text: `错误: ${error instanceof Error ? error.message : String(error)}\n时间: ${new Date().toISOString()}\n来源: middleware.ts\n操作: log_visit_info`
-          })
-        });
-      } catch (webhookError) {
-        console.error('Failed to send error to webhook:', webhookError);
-      }
-    }
-  }
+  // fire-and-forget 送到 /api/visit（Node runtime）写 Cosmos，避免 Edge runtime 的 @azure/identity 限制
+  const visitUrl = new URL('/api/visit', request.url);
+  fetch(visitUrl.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(visitInfo),
+    keepalive: true,
+  }).catch(() => {
+    // 忽略：不阻塞请求；失败由 /api/visit 内部记录
+  });
 
   // 身份验证逻辑
   if (!token && !isAuthPage) {
@@ -73,6 +56,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
-
-// 明確宣告走 Node.js runtime（Cosmos SDK + DefaultAzureCredential 需要，Edge runtime 跑不起來）
-export const runtime = 'nodejs';
