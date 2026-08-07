@@ -16,7 +16,15 @@ Doc Update Notification Bot - monitors Microsoft documentation updates and sends
 
 ## Skills
 
-- **[Deploy to VM](.claude/skills/deploy-vm.md)**: Full deployment guide including git sync, config upload, backend/frontend/MCP server restart
+- **[Deploy to ACA Non-Prod](.claude/skills/deploy-aca-nonprod.md)**: Corp non-prod ACA (Nick sub) deploy — image build, revision rollout, UAMI + Cosmos verification. **This is the current live deploy path.**
+- **[Deploy to VM](.claude/skills/deploy-vm.md)**: Legacy VM deploy (Joey's old prod, mostly decommissioned as of 2026-07). Kept for historical reference.
+
+## Current live environment
+
+- Domains: `docs.westiedoubao.com`, `mcp.westiedoubao.com` → corp non-prod ACA (`104.208.123.126`)
+- Sub: `NickShieh-Subscription` (`937c6f45-...`), tenant `16b3c013-...`
+- RG: `rg-eyesondocs` (eastasia)
+- See [Architecture.md](./Architecture.md) for full component diagram.
 
 ## Key Paths (VM)
 
