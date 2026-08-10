@@ -1,15 +1,10 @@
 from typing import Any, Optional
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 import os
 
-# 初始化FastMCP服务器
-# host/port 走 env var（FASTMCP_HOST / FASTMCP_PORT），在 ACA 內綁 0.0.0.0:8000 讓 ingress 進得來
-mcp = FastMCP(
-    "doc_updates",
-    host=os.environ.get("FASTMCP_HOST", "0.0.0.0"),
-    port=int(os.environ.get("FASTMCP_PORT", "8000")),
-)
+# MCP v2: host/port 從 constructor 搬到 run()，這裡只留 server name
+mcp = MCPServer("doc_updates")
 
 # 常量
 API_BASE = os.environ.get("API_BASE", "https://docs.westiedoubao.com/api")
@@ -395,7 +390,9 @@ async def fetch(id: str) -> str:
     return f"未找到更新：产品={requested_product}，ID={update_id}。"
 
 if __name__ == "__main__":
-    # 运行 HTTP streamable 服务器
-    # 这是推荐的 web 部署方式，适合通过网络访问
-    mcp.run(transport="streamable-http")
-    # mcp.run(transport='stdio')
+    # MCP v2: host/port 現在直接傳給 run()，不再讀 FASTMCP_HOST/FASTMCP_PORT 環境變數
+    mcp.run(
+        transport="streamable-http",
+        host=os.environ.get("MCP_HOST", "0.0.0.0"),
+        port=int(os.environ.get("MCP_PORT", "8000")),
+    )

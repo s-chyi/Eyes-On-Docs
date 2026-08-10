@@ -25,7 +25,7 @@ docs.westiedoubao.com  mcp.westiedoubao.com  (both A → 104.208.123.126)
     ┌───────────┼──────────────────────┐
     ▼           ▼                      ▼
 ca-web       ca-mcp             caj-monitor (cron */2h)
-Next.js 14   FastMCP HTTP       Python + GPT
+Next.js 14   MCP v2 HTTP        Python + GPT
     │           │                      │
     │  (all use UAMI id-eyesondocs-nonprod
     │   → AZURE_CLIENT_ID env → ManagedIdentityCredential)
@@ -42,7 +42,7 @@ Next.js 14   FastMCP HTTP       Python + GPT
 | Component | Runtime | Auth to Cosmos | Notes |
 |---|---|---|---|
 | `ca-eyesondocs-web-nonprod` | Next.js 14, standalone | UAMI + `AZURE_CLIENT_ID` | Serves UI + REST API. Middleware runs on Edge, so Cosmos writes are proxied via `/api/visit` (Node runtime). |
-| `ca-eyesondocs-mcp-nonprod` | FastMCP HTTP | UAMI + `AZURE_CLIENT_ID` | MCP tool server. Tools: `get_doc_updates`, `search_updates`, `get_usage_stats` (last requires `DOCS_USAGE_ADMIN_PASSWORD`). |
+| `ca-eyesondocs-mcp-nonprod` | MCP Python SDK v2 (streamable-http) | UAMI + `AZURE_CLIENT_ID` | MCP tool server. Tools: `get_doc_updates`, `search_updates`, `search`, `fetch`, `get_usage_stats` (last requires `DOCS_USAGE_ADMIN_PASSWORD`). Uses `MCPServer` API (mcp>=2.0); host/port via `MCP_HOST`/`MCP_PORT` env passed to `mcp.run()`. |
 | `caj-eyesondocs-monitor-nonprod` | Python cron job | UAMI + `AZURE_CLIENT_ID` | Every 2h polls MicrosoftDocs repos, runs GPT, upserts to Cosmos. Uses gpt-4.1-mini via `ai-foundry-jpe.cognitiveservices.azure.com`. |
 
 ## Auth architecture

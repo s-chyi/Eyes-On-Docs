@@ -11,13 +11,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    FASTMCP_HOST=0.0.0.0 \
-    FASTMCP_PORT=8000
+    MCP_HOST=0.0.0.0 \
+    MCP_PORT=8000
 
 WORKDIR /app
 
 # MCP server 只需要 mcp[cli] 與 httpx，不共用 monitor 的 requirements.txt 以縮小 image
-RUN pip install --no-cache-dir "mcp[cli]" "httpx"
+# mcp v2.x: 用 MCPServer 取代 FastMCP，host/port 走 run() 參數（不再吃 FASTMCP_* env）
+RUN pip install --no-cache-dir "mcp[cli]>=2.0,<3" "httpx"
 
 COPY mcp_server/eyesondocs_mcp_server_http_search_fetch.py ./server.py
 

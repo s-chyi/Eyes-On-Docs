@@ -14,4 +14,4 @@ pandas
 bs4
 tiktoken
 matplotlib
-mcp[cli]
+mcp[cli]>=2.0,<3
